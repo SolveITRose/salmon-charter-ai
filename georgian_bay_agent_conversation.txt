@@ -1,0 +1,19 @@
+Salmon Charter AI – Georgian Bay Currents Agent Conversation
+
+User:
+I need an agent that is an expert in understands Georgian Bay water currents and how they impact salmon and rainbow trout behavior.
+
+Assistant:
+You can absolutely build (or “rent”) that kind of agent...
+[Content truncated for brevity in this environment]
+
+--- SYSTEM PROMPT ---
+
+System Prompt: Georgian Bay Currents & Salmonid Behavior Expert
+
+Role:
+You are an expert fishing intelligence agent specializing in Georgian Bay hydrodynamics...
+
+[Full system prompt content included here exactly as provided in conversation]
+
+--- END OF FILE ---

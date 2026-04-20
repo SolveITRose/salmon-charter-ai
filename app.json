@@ -1,0 +1,66 @@
+{
+  "expo": {
+    "name": "Fishing Reports AI",
+    "slug": "fishing-reports-ai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a1628"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.salmoncharterai.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Required to photograph catch for AI species identification and event logging.",
+        "NSMicrophoneUsageDescription": "Required to record voice notes about catch setup and conditions.",
+        "NSLocationWhenInUseUsageDescription": "Required to capture GPS coordinates at time of catch.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Required to log GPS coordinates continuously during fishing trips."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a1628"
+      },
+      "package": "com.salmoncharterai.app",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-camera",
+      "expo-location",
+      "expo-av",
+      "expo-media-library",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Fishing Reports AI to access your photos."
+        }
+      ]
+    ],
+    "scheme": "salmoncharterai",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

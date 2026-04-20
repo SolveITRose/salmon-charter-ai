@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(curl -s \"https://weather.com/en-CA/weather/today/l/990e4e70fd1dac48d128f00284375ef5f909d659a4baa391a60de818fc1786f5\")",
+      "Bash(curl -s -A \"Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36\" \"https://weather.com/en-CA/weather/today/l/990e4e70fd1dac48d128f00284375ef5f909d659a4baa391a60de818fc1786f5\")",
+      "Bash(%LOCALAPPDATA%\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe connect *)",
+      "Bash(\"/c/Users/brian/AppData/Local/Android/Sdk/platform-tools/adb.exe\" connect *)",
+      "Bash(\"/c/Users/brian/AppData/Local/Android/Sdk/platform-tools/adb.exe\" -s 192.168.2.88:41183 reverse tcp:8081 tcp:8081)",
+      "Read(//c/Users/brian/.claude/**)",
+      "Bash(npx expo *)",
+      "WebSearch"
+    ]
+  }
+}

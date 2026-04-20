@@ -1,0 +1,84 @@
+Salmon Charter AI – Hydrodynamic Modeling Conversation Export Date:
+2026-04-01 09:43:58
+
+------------------------------------------------------------------------
+
+SECTION 1: PROJECT ROADMAP - Vision: Improve catch rates using
+environmental + boat + setup data - Target: Georgian Bay charter
+captains - Key systems: - Data capture (photo trigger, GPS, weather,
+voice input) - Data structuring (event + trip objects) - AI layer
+(pattern detection, route prediction) - Interface (recommendations,
+replay) - Expansion (NMEA, multi-boat dataset)
+
+------------------------------------------------------------------------
+
+SECTION 2: EXTERNAL SCIENCE INSIGHTS (Newsletter Analysis)
+
+Key Drivers Identified: - Currents and circulation patterns - Mixing
+zones and residence time - Storm-driven redistribution - Particle
+accumulation zones - Wetland influence (Phragmites) - Sediment chemistry
+and nutrient cycling - Oxygen / redox / methane dynamics
+
+Key Effects: - Predictable debris + particle traps - Nutrient
+concentration zones - Bacterial hotspot formation - Oxygen variability -
+Shoreline accumulation patterns
+
+------------------------------------------------------------------------
+
+SECTION 3: HYDRODYNAMIC SCORING MODEL
+
+HPS (0–100) composed of:
+
+1.  Wind Transport Score (25%)
+2.  Mixing & Stratification Score (20%)
+3.  Residence Time Score (20%)
+4.  Storm Pulse Score (20%)
+5.  Shoreline/Wetland Score (15%)
+
+Purpose: Predict high-probability fish zones via environmental
+structure.
+
+------------------------------------------------------------------------
+
+SECTION 4: MODEL MECHANICS
+
+Wind: - Drives surface currents and convergence
+
+Mixing: - Controls nutrient and oxygen distribution
+
+Residence Time: - Determines retention of particles and bait
+
+Storm Pulse: - Redistributes nutrients and forage
+
+Wetlands: - Create eddies and trap zones
+
+------------------------------------------------------------------------
+
+SECTION 5: STRESS TEST FRAMEWORK
+
+Test Event Pattern: - Sustained wind (24–48h) - Storm event - 36–72h
+stabilization
+
+Validation Checks: A. Storm timing response B. Particle trap consistency
+C. Mixing realism D. Wetland/embayment contrast
+
+Diagnostics: - Hotspot stability index - Wind-response correlation -
+Storm peak timing error - Structure contrast ratio
+
+------------------------------------------------------------------------
+
+SECTION 6: CORE INSIGHT
+
+Georgian Bay is structurally predictable via:
+
+-   Hydrodynamics
+-   Sediment processes
+-   Shoreline geometry
+-   Weather patterns
+
+These control: - Particle accumulation - Nutrient zones - Fish behavior
+patterns
+
+------------------------------------------------------------------------
+
+END OF EXPORT

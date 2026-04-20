@@ -1,0 +1,516 @@
+import React, { useRef, useEffect, memo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Animated,
+  TouchableOpacity,
+  Linking,
+} from 'react-native';
+import { TripConditions } from '../services/weatherWaterService';
+
+interface Props {
+  conditions: TripConditions | null;
+  loading: boolean;
+  onRetry?: () => void;
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function degreesToCardinal(deg: number): string {
+  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  return dirs[Math.round(deg / 45) % 8];
+}
+
+function dash(v: string | number | null | undefined): string {
+  if (v === null || v === undefined) return '—';
+  return String(v);
+}
+
+function moonEmoji(label: string | null): string {
+  switch (label) {
+    case 'new moon':       return '🌑';
+    case 'waxing crescent': return '🌒';
+    case 'first quarter':  return '🌓';
+    case 'waxing gibbous': return '🌔';
+    case 'full moon':      return '🌕';
+    case 'waning gibbous': return '🌖';
+    case 'last quarter':   return '🌗';
+    case 'waning crescent': return '🌘';
+    default:               return '🌙';
+  }
+}
+
+function trendArrow(trend: TripConditions['pressure_trend']): string {
+  if (trend === 'rising')  return ' ↑';
+  if (trend === 'falling') return ' ↓';
+  if (trend === 'steady')  return ' →';
+  return '';
+}
+
+// ── Sub-components ─────────────────────────────────────────────────────────
+
+function SkeletonLine({ width = '100%' }: { width?: string | number }) {
+  const opacity = useRef(new Animated.Value(0.3)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.7, duration: 700, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.3, duration: 700, useNativeDriver: true }),
+      ]),
+    ).start();
+  }, [opacity]);
+  return (
+    <Animated.View style={[styles.skeletonLine, { width: width as number, opacity }]} />
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {children}
+    </View>
+  );
+}
+
+function Row({
+  label,
+  value,
+  bold = false,
+}: {
+  label: string;
+  value: string;
+  bold?: boolean;
+}) {
+  return (
+    <View style={styles.row}>
+      <Text style={styles.rowLabel}>{label}</Text>
+      <Text style={[styles.rowValue, bold && styles.rowValueBold]}>{value}</Text>
+    </View>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────
+
+const WeatherWaterCard = memo(function WeatherWaterCard({
+  conditions,
+  loading,
+  onRetry,
+}: Props) {
+  if (loading) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Current Conditions</Text>
+        <View style={styles.skeletonBlock}>
+          <SkeletonLine width="55%" />
+          <SkeletonLine width="80%" />
+          <SkeletonLine width="70%" />
+          <SkeletonLine width="75%" />
+          <SkeletonLine width="65%" />
+          <SkeletonLine width="80%" />
+        </View>
+      </View>
+    );
+  }
+
+  if (!conditions) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Current Conditions</Text>
+        <Text style={styles.errorText}>Unable to load conditions</Text>
+        {onRetry && (
+          <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  }
+
+  const ratingBars =
+    conditions.solunar_day_rating !== null
+      ? Math.round(Math.min(conditions.solunar_day_rating / 6, 1) * 5)
+      : 0;
+
+  return (
+    <View style={styles.card}>
+      {/* Marine Alert Banner — only shown when active */}
+      {conditions.marine_warning_active && (
+        <View style={styles.alertBanner}>
+          <Text style={styles.alertText}>
+            ⚠  {conditions.marine_warning_text ?? 'Marine Warning Active'}
+          </Text>
+        </View>
+      )}
+
+      <Text style={styles.cardTitle}>Current Conditions</Text>
+      <Text style={styles.cardSubtitle}>
+        {conditions.lake_id.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+        {'  ·  '}
+        {conditions.atmospheric_source === 'ndbc'
+          ? `Buoy ${conditions.ndbc_station_id}`
+          : 'OpenWeatherMap (buoy offline)'}
+        {'  ·  '}
+        {`${conditions.query_lat.toFixed(4)}°N  ${Math.abs(conditions.query_lng).toFixed(4)}°W`}
+      </Text>
+
+      {/* 1. Wind & Sky */}
+      <Section title="Wind & Sky">
+        <Row
+          label="Pressure"
+          value={
+            conditions.barometric_pressure_hpa !== null
+              ? `${conditions.barometric_pressure_hpa} hPa${trendArrow(conditions.pressure_trend)}`
+              : '—'
+          }
+        />
+        <Row
+          label="Wind"
+          value={
+            conditions.wind_speed_mph !== null
+              ? `${conditions.wind_speed_mph} mph ${conditions.wind_direction_label ?? ''}`
+              : '—'
+          }
+        />
+        <Row
+          label="Gusts"
+          value={conditions.wind_gust_mph !== null ? `${conditions.wind_gust_mph} mph` : '—'}
+        />
+        <Row
+          label="Conditions"
+          value={dash(conditions.conditions_text)}
+        />
+        <Row
+          label="Air Temp"
+          value={conditions.air_temp_c !== null ? `${conditions.air_temp_c}°C` : '—'}
+        />
+        <Row
+          label="Feels Like"
+          value={conditions.feels_like_c !== null ? `${conditions.feels_like_c}°C` : '—'}
+        />
+        <Row
+          label="Humidity"
+          value={conditions.humidity_pct !== null ? `${conditions.humidity_pct}%` : '—'}
+        />
+        <Row
+          label="Dew Point"
+          value={conditions.dew_point_c !== null ? `${conditions.dew_point_c}°C` : '—'}
+        />
+        <Row
+          label="Cloud Cover"
+          value={conditions.cloud_cover_pct !== null ? `${conditions.cloud_cover_pct}%` : '—'}
+        />
+        <Row
+          label="Visibility"
+          value={conditions.visibility_km !== null ? `${conditions.visibility_km} km` : '—'}
+        />
+        <Row
+          label="UV Index"
+          value={
+            conditions.uv_index !== null
+              ? `${conditions.uv_index} · ${conditions.uv_index_label ?? ''}`
+              : '—'
+          }
+        />
+      </Section>
+
+      {/* 2. Weather History */}
+      {conditions.previous_wind && conditions.previous_wind.length > 0 && (
+        <Section title="Weather History (last 24h)">
+          <View style={styles.windHistoryHeader}>
+            <Text style={[styles.windHistoryCol, styles.windHistoryColTime]}>Time</Text>
+            <Text style={styles.windHistoryCol}>Wind</Text>
+            <Text style={styles.windHistoryCol}>Temp</Text>
+            <Text style={styles.windHistoryCol}>Cloud</Text>
+          </View>
+          {[...conditions.previous_wind].reverse().map((w, i) => (
+            <View key={i} style={styles.windHistoryRow}>
+              <Text style={[styles.windHistoryCol, styles.windHistoryColTime, styles.windHistoryVal]}>{w.time}</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.speed_mph} {w.direction_label}</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.temp_c != null ? `${w.temp_c}°` : '—'}</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.cloud_cover_pct != null ? `${w.cloud_cover_pct}%` : '—'}</Text>
+            </View>
+          ))}
+        </Section>
+      )}
+
+      {/* 3. Water */}
+      <Section title="Water">
+        <Row
+          label="SST (Buoy)"
+          value={conditions.sst_buoy_c !== null ? `${conditions.sst_buoy_c}°C` : '—'}
+        />
+        <Row
+          label="SST (Satellite)"
+          value={conditions.sst_satellite_c !== null ? `${conditions.sst_satellite_c}°C` : '—'}
+        />
+        <Row
+          label="Wave Height"
+          value={conditions.wave_height_ft !== null ? `${conditions.wave_height_ft} ft` : '—'}
+        />
+        <Row
+          label="Wave Period"
+          value={
+            conditions.wave_period_dominant_s !== null
+              ? `${conditions.wave_period_dominant_s} s`
+              : '—'
+          }
+        />
+        <Row
+          label="Wave Direction"
+          value={
+            conditions.wave_direction_deg !== null
+              ? `${degreesToCardinal(conditions.wave_direction_deg)}  ${conditions.wave_direction_deg}°`
+              : '—'
+          }
+        />
+        <Row
+          label="Current Speed"
+          value={conditions.current_speed_knots !== null ? `${conditions.current_speed_knots} kn` : '—'}
+        />
+        <Row
+          label="Current Direction"
+          value={
+            conditions.current_direction_deg !== null
+              ? `${conditions.current_direction_label}  ${conditions.current_direction_deg}°`
+              : '—'
+          }
+        />
+        <TouchableOpacity
+          onPress={() => Linking.openURL('https://www.glerl.noaa.gov/res/glcfs/ncast.php?lake=mih')}
+          style={styles.glerlLink}
+        >
+          <Text style={styles.glerlLinkText}>View Georgian Bay Currents → GLERL</Text>
+        </TouchableOpacity>
+      </Section>
+
+      {/* 3. Lunar */}
+      <Section title="Lunar">
+        <Row
+          label="Moon Phase"
+          value={
+            conditions.moon_phase_label
+              ? `${moonEmoji(conditions.moon_phase_label)}  ${conditions.moon_phase_label}`
+              : '—'
+          }
+        />
+        <Row label="Moonrise" value={dash(conditions.moonrise_time)} />
+        <Row label="Moonset"  value={dash(conditions.moonset_time)} />
+        <Row label="Sunrise"  value={dash(conditions.sunrise_time)} />
+        <Row label="Sunset"   value={dash(conditions.sunset_time)} />
+      </Section>
+
+      {/* 4. Feeding Windows */}
+      <Section title="Feeding Windows">
+        <View style={styles.ratingRow}>
+          <Text style={styles.rowLabel}>Day Rating</Text>
+          <View style={styles.ratingBars}>
+            {[1, 2, 3, 4, 5].map((i) => (
+              <View
+                key={i}
+                style={[styles.ratingBar, i <= ratingBars && styles.ratingBarFilled]}
+              />
+            ))}
+          </View>
+        </View>
+        <Row
+          label="Major 1"
+          value={
+            conditions.solunar_major_1_start && conditions.solunar_major_1_stop
+              ? `${conditions.solunar_major_1_start} – ${conditions.solunar_major_1_stop}`
+              : '—'
+          }
+          bold
+        />
+        <Row
+          label="Major 2"
+          value={
+            conditions.solunar_major_2_start && conditions.solunar_major_2_stop
+              ? `${conditions.solunar_major_2_start} – ${conditions.solunar_major_2_stop}`
+              : '—'
+          }
+          bold
+        />
+        <Row
+          label="Minor 1"
+          value={
+            conditions.solunar_minor_1_start && conditions.solunar_minor_1_stop
+              ? `${conditions.solunar_minor_1_start} – ${conditions.solunar_minor_1_stop}`
+              : '—'
+          }
+        />
+        <Row
+          label="Minor 2"
+          value={
+            conditions.solunar_minor_2_start && conditions.solunar_minor_2_stop
+              ? `${conditions.solunar_minor_2_start} – ${conditions.solunar_minor_2_stop}`
+              : '—'
+          }
+        />
+      </Section>
+    </View>
+  );
+});
+
+export default WeatherWaterCard;
+
+// ── Styles ─────────────────────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: '#122040',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#1a2d4a',
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  alertBanner: {
+    backgroundColor: '#7f1d1d',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ff4444',
+  },
+  alertText: {
+    color: '#fca5a5',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  cardTitle: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  cardSubtitle: {
+    color: '#8899aa',
+    fontSize: 11,
+    paddingHorizontal: 14,
+    paddingBottom: 8,
+  },
+  section: {
+    borderTopWidth: 1,
+    borderTopColor: '#1a2d4a',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  sectionTitle: {
+    color: '#1e90ff',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 6,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 3,
+  },
+  rowLabel: {
+    color: '#8899aa',
+    fontSize: 12,
+  },
+  rowValue: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'right',
+    flexShrink: 1,
+    marginLeft: 8,
+  },
+  rowValueBold: {
+    fontWeight: '700',
+    color: '#7dd3fc',
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 3,
+    marginBottom: 4,
+  },
+  ratingBars: {
+    flexDirection: 'row',
+    gap: 3,
+  },
+  ratingBar: {
+    width: 14,
+    height: 10,
+    borderRadius: 2,
+    backgroundColor: '#1a2d4a',
+    borderWidth: 1,
+    borderColor: '#334d6e',
+  },
+  ratingBarFilled: {
+    backgroundColor: '#1e90ff',
+    borderColor: '#1e90ff',
+  },
+  windHistoryHeader: {
+    flexDirection: 'row',
+    paddingBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a2d4a',
+    marginBottom: 2,
+  },
+  windHistoryRow: {
+    flexDirection: 'row',
+    paddingVertical: 2,
+  },
+  windHistoryCol: {
+    flex: 1,
+    color: '#8899aa',
+    fontSize: 11,
+  },
+  windHistoryColTime: {
+    flex: 1.2,
+  },
+  windHistoryVal: {
+    color: '#ffffff',
+  },
+  skeletonBlock: {
+    padding: 14,
+    gap: 10,
+  },
+  skeletonLine: {
+    height: 12,
+    backgroundColor: '#1a2d4a',
+    borderRadius: 4,
+  },
+  errorText: {
+    color: '#8899aa',
+    fontSize: 13,
+    textAlign: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+  },
+  glerlLink: {
+    marginTop: 6,
+    paddingVertical: 4,
+  },
+  glerlLinkText: {
+    color: '#1e90ff',
+    fontSize: 12,
+    textDecorationLine: 'underline',
+  },
+  retryButton: {
+    alignSelf: 'center',
+    backgroundColor: '#1e3a5f',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginBottom: 14,
+  },
+  retryText: {
+    color: '#1e90ff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+});

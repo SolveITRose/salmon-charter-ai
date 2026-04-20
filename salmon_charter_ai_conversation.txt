@@ -1,0 +1,28 @@
+Salmon Charter AI - Conversation Export
+
+User Idea: Build an AI-driven fishing catch logging system where: - A
+photo triggers an event - System captures GPS, boat data, marine
+weather - Mate adds setup data (downrigger depth, lure, etc.) - All data
+stored and displayed with the photo
+
+Key Architecture: - Android app - Local-first storage with auto-sync -
+Event-based folder system - JSON snapshot for all data - Voice +
+structured input
+
+Roles: Captain: - Takes photo - Captures GPS, heading, speed, weather
+
+Mate: - Adds setup data - Records voice notes
+
+Data Sources: - Phone GPS (MVP) - Signal K (NMEA2000) - Raw NMEA 0183
+(TCP/UDP)
+
+Workflow: 1. Captain logs catch (photo) 2. App creates event + code 3.
+Mate joins event with code 4. Adds setup + voice 5. System stores
+everything locally 6. Syncs when signal is available
+
+AI Agent Classification: - Perception: sensors, photo, weather, voice -
+Decision: trigger logic, fallback handling - Action: capture, store,
+sync - Memory: event logs - Future: predictive insights
+
+Conclusion: System is a practical AI agent with future potential for
+predictive fishing insights.

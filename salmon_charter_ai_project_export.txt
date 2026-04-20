@@ -1,0 +1,26 @@
+PROJECT: Salmon Charter AI EXPORT DATE: 2026-04-04 13:54:35
+
+=== Conversation 1: Georgian Bay Fish Agent === User: I need an agent
+that is an expert in understands Georgian Bay water currents and how
+they impact salmon and rainbow trout behavior. User: Yes I need a clean
+agent system prompt User: How to I run the prompt you just made? User:
+Export the whole conversion to plain text file
+
+=== Conversation 2: Marine Weather AI Stack === User: Usually the 1st
+mate will net the fish then someone else, the captain usually will snap
+the photo User: Usually the captain knows the boat and weather data and
+the 1st mate knows the downrigger, setup data User: Right so what is the
+whole plan from start to finish User: Is this an example of an AI agent?
+User: Is Garmin working on these types of AI User: Yes, other brands
+like Lowrance, Simrad and Hummingbird User: Export the whole conversion
+to plain text file
+
+=== Conversation 3: Table Output Request === User: Which chat within
+this project did you build a plan User: Sure let’s take a look. Output
+it to a table format User: I learned something new that adds more
+external data sources. User: Analyze this file and extract anything that
+impacts currents, locations where particles pile up, mixing zones, PH
+levels etc. User: Export the whole conversion to plain text file
+
+=== Current Conversation === User: Export this project and all the chats
+within to a plain text file.
