@@ -46,12 +46,20 @@ export default function CaptainScreen() {
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const [pendingBites, setPendingBites] = useState<CatchEvent[]>([]);
   const [fishOnLoading, setFishOnLoading] = useState(false);
+  const [fishOnMessage, setFishOnMessage] = useState<string | null>(null);
+  const [showBiteList, setShowBiteList] = useState(false);
   const cancelledRef = useRef(false);
 
   useEffect(() => {
     loadTripConditions();
     loadPendingBites();
   }, []);
+
+  useEffect(() => {
+    if (!fishOnMessage) return;
+    const t = setTimeout(() => setFishOnMessage(null), 4000);
+    return () => clearTimeout(t);
+  }, [fishOnMessage]);
 
   const loadTripConditions = async () => {
     setTripConditionsLoading(true);
@@ -168,10 +176,10 @@ export default function CaptainScreen() {
 
       await insertEvent(event);
       await loadPendingBites();
-      Alert.alert('Fish On! 🎣', 'Bite marked! Add photo when ready.');
+      setFishOnMessage('Bite marked! Add photo when ready.');
     } catch (error) {
       console.error('[Captain] handleFishOn error:', error);
-      Alert.alert('Error', 'Failed to record bite. Try again.');
+      setFishOnMessage('Failed to record bite. Try again.');
     } finally {
       setFishOnLoading(false);
     }
@@ -387,24 +395,13 @@ export default function CaptainScreen() {
 
   const handleUsePhoto = useCallback(async () => {
     if (!pendingPhotoUri) return;
-    const photoUri = pendingPhotoUri;
+    processNewCatch(pendingPhotoUri);
+  }, [pendingPhotoUri, processNewCatch]);
 
-    if (pendingBites.length > 0) {
-      const bite = pendingBites[0];
-      const biteTime = formatTimestamp(bite.biteTimestamp || bite.timestamp);
-      Alert.alert(
-        'Link to Fish On event?',
-        `Hooked: ${biteTime}\nCode: ${bite.eventCode}`,
-        [
-          { text: 'Link to this bite', onPress: () => processLinkedCatch(photoUri, bite) },
-          { text: 'New event', style: 'cancel', onPress: () => processNewCatch(photoUri) },
-        ]
-      );
-      return;
-    }
-
-    processNewCatch(photoUri);
-  }, [pendingPhotoUri, pendingBites, processLinkedCatch, processNewCatch]);
+  const handleLinkToBite = useCallback(async () => {
+    if (!pendingPhotoUri || pendingBites.length === 0) return;
+    processLinkedCatch(pendingPhotoUri, pendingBites[0]);
+  }, [pendingPhotoUri, pendingBites, processLinkedCatch]);
 
   const handleShareCode = useCallback(async () => {
     if (!currentEvent) return;
@@ -468,21 +465,33 @@ export default function CaptainScreen() {
           <Text style={styles.fishOnSub}>Tap the moment a fish strikes</Text>
         </TouchableOpacity>
 
-        {pendingBites.length > 0 && (
-          <TouchableOpacity
-            style={styles.pendingBitesBar}
-            onPress={() => {
-              const lines = pendingBites
-                .map((b, i) => `${i + 1}. ${b.eventCode} — hooked ${formatTimestamp(b.biteTimestamp || b.timestamp)}`)
-                .join('\n');
-              Alert.alert(`${pendingBites.length} fish pending photo`, lines);
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.pendingBitesText}>
-              🐟 {pendingBites.length} fish pending photo — tap for details
-            </Text>
+        {fishOnMessage && (
+          <TouchableOpacity style={styles.fishOnBanner} onPress={() => setFishOnMessage(null)} activeOpacity={0.8}>
+            <Text style={styles.fishOnBannerText}>🎣 {fishOnMessage}</Text>
           </TouchableOpacity>
+        )}
+
+        {pendingBites.length > 0 && (
+          <>
+            <TouchableOpacity
+              style={styles.pendingBitesBar}
+              onPress={() => setShowBiteList(v => !v)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.pendingBitesText}>
+                🐟 {pendingBites.length} fish pending photo {showBiteList ? '▲' : '▼'}
+              </Text>
+            </TouchableOpacity>
+            {showBiteList && (
+              <View style={styles.biteList}>
+                {pendingBites.map((b, i) => (
+                  <Text key={b.id} style={styles.biteListItem}>
+                    {i + 1}. {b.eventCode} — hooked {formatTimestamp(b.biteTimestamp || b.timestamp)}
+                  </Text>
+                ))}
+              </View>
+            )}
+          </>
         )}
 
         <TouchableOpacity
@@ -516,15 +525,26 @@ export default function CaptainScreen() {
 
   // ─── Render: Preview ──────────────────────────────────────────────────────
   if (screenState === 'preview' && pendingPhotoUri) {
+    const bite = pendingBites[0] ?? null;
     return (
       <View style={styles.container}>
         <Image source={{ uri: pendingPhotoUri }} style={styles.previewImage} resizeMode="contain" />
+        {bite && (
+          <View style={styles.linkBiteBar}>
+            <Text style={styles.linkBiteLabel}>
+              🎣 Fish On at {formatTimestamp(bite.biteTimestamp || bite.timestamp)}
+            </Text>
+            <TouchableOpacity style={styles.linkBiteButton} onPress={handleLinkToBite}>
+              <Text style={styles.linkBiteButtonText}>Link to this bite</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         <View style={styles.previewActions}>
           <TouchableOpacity style={styles.retakeButton} onPress={handleRetake}>
             <Text style={styles.retakeButtonText}>Retake</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.usePhotoButton} onPress={handleUsePhoto}>
-            <Text style={styles.usePhotoButtonText}>Use Photo</Text>
+            <Text style={styles.usePhotoButtonText}>{bite ? 'New Event' : 'Use Photo'}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -714,13 +734,29 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.75)',
     fontSize: 13,
   },
+  fishOnBanner: {
+    backgroundColor: '#1b3a1b',
+    marginHorizontal: 24,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#00c853',
+  },
+  fishOnBannerText: {
+    color: '#00e676',
+    fontSize: 13,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
   pendingBitesBar: {
     backgroundColor: '#1a2a10',
     marginHorizontal: 24,
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 4,
     borderWidth: 1,
     borderColor: '#4caf50',
   },
@@ -728,6 +764,43 @@ const styles = StyleSheet.create({
     color: '#69f0ae',
     fontSize: 13,
     textAlign: 'center',
+  },
+  biteList: {
+    marginHorizontal: 24,
+    marginBottom: 12,
+    backgroundColor: '#111e10',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#2e5a2e',
+  },
+  biteListItem: {
+    color: '#a5d6a7',
+    fontSize: 12,
+    paddingVertical: 3,
+  },
+  linkBiteBar: {
+    backgroundColor: '#1b3a1b',
+    padding: 12,
+    borderTopWidth: 1,
+    borderColor: '#00c853',
+    alignItems: 'center',
+    gap: 8,
+  },
+  linkBiteLabel: {
+    color: '#69f0ae',
+    fontSize: 13,
+  },
+  linkBiteButton: {
+    backgroundColor: '#00c853',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 24,
+  },
+  linkBiteButtonText: {
+    color: '#000000',
+    fontSize: 14,
+    fontWeight: '700',
   },
   logCatchButton: {
     backgroundColor: '#1e90ff',
