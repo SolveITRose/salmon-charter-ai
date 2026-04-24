@@ -54,7 +54,13 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "bundler": "metro"
+      "bundler": "metro",
+      "name": "Salmon Charter AI",
+      "shortName": "Charter AI",
+      "themeColor": "#0a1628",
+      "backgroundColor": "#0a1628",
+      "display": "standalone",
+      "description": "Georgian Bay salmon fishing assistant"
     },
     "plugins": [
       "expo-router",
