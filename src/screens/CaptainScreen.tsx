@@ -48,6 +48,7 @@ export default function CaptainScreen() {
   const [fishOnLoading, setFishOnLoading] = useState(false);
   const [fishOnMessage, setFishOnMessage] = useState<string | null>(null);
   const [showBiteList, setShowBiteList] = useState(false);
+  const [selectedBiteForPhoto, setSelectedBiteForPhoto] = useState<CatchEvent | null>(null);
   const cancelledRef = useRef(false);
 
   useEffect(() => {
@@ -108,6 +109,7 @@ export default function CaptainScreen() {
   const handleCancel = useCallback(() => {
     cancelledRef.current = true;
     setPendingPhotoUri(null);
+    setSelectedBiteForPhoto(null);
     setScreenState('home');
     setProcessingStep('');
   }, []);
@@ -204,6 +206,25 @@ export default function CaptainScreen() {
       setScreenState('preview');
     } catch (error) {
       console.error('[Captain] handleLogCatch error:', error);
+    }
+  }, []);
+
+  const handlePhotoBite = useCallback(async (bite: CatchEvent) => {
+    try {
+      const launch = Platform.OS === 'web'
+        ? ImagePicker.launchImageLibraryAsync
+        : ImagePicker.launchCameraAsync;
+      const pickerResult = await launch({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+        allowsEditing: false,
+      });
+      if (pickerResult.canceled || !pickerResult.assets[0]) return;
+      setSelectedBiteForPhoto(bite);
+      setPendingPhotoUri(pickerResult.assets[0].uri);
+      setScreenState('preview');
+    } catch (error) {
+      console.error('[Captain] handlePhotoBite error:', error);
     }
   }, []);
 
@@ -399,9 +420,11 @@ export default function CaptainScreen() {
   }, [pendingPhotoUri, processNewCatch]);
 
   const handleLinkToBite = useCallback(async () => {
-    if (!pendingPhotoUri || pendingBites.length === 0) return;
-    processLinkedCatch(pendingPhotoUri, pendingBites[0]);
-  }, [pendingPhotoUri, pendingBites, processLinkedCatch]);
+    if (!pendingPhotoUri) return;
+    const bite = selectedBiteForPhoto ?? pendingBites[0];
+    if (!bite) return;
+    processLinkedCatch(pendingPhotoUri, bite);
+  }, [pendingPhotoUri, selectedBiteForPhoto, pendingBites, processLinkedCatch]);
 
   const handleShareCode = useCallback(async () => {
     if (!currentEvent) return;
@@ -485,9 +508,14 @@ export default function CaptainScreen() {
             {showBiteList && (
               <View style={styles.biteList}>
                 {pendingBites.map((b, i) => (
-                  <Text key={b.id} style={styles.biteListItem}>
-                    {i + 1}. {b.eventCode} — hooked {formatTimestamp(b.biteTimestamp || b.timestamp)}
-                  </Text>
+                  <View key={b.id} style={styles.biteListRow}>
+                    <Text style={styles.biteListItem}>
+                      {i + 1}. {b.eventCode} — hooked {formatTimestamp(b.biteTimestamp || b.timestamp)}
+                    </Text>
+                    <TouchableOpacity style={styles.biteListCamera} onPress={() => handlePhotoBite(b)}>
+                      <Text style={styles.biteListCameraText}>📷</Text>
+                    </TouchableOpacity>
+                  </View>
                 ))}
               </View>
             )}
@@ -525,7 +553,7 @@ export default function CaptainScreen() {
 
   // ─── Render: Preview ──────────────────────────────────────────────────────
   if (screenState === 'preview' && pendingPhotoUri) {
-    const bite = pendingBites[0] ?? null;
+    const bite = selectedBiteForPhoto ?? (pendingBites.length === 1 ? pendingBites[0] : null);
     return (
       <View style={styles.container}>
         <Image source={{ uri: pendingPhotoUri }} style={styles.previewImage} resizeMode="contain" />
@@ -774,10 +802,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2e5a2e',
   },
+  biteListRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   biteListItem: {
     color: '#a5d6a7',
     fontSize: 12,
     paddingVertical: 3,
+    flex: 1,
+  },
+  biteListCamera: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  biteListCameraText: {
+    fontSize: 20,
   },
   linkBiteBar: {
     backgroundColor: '#1b3a1b',
