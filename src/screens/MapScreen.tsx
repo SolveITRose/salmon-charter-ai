@@ -13,6 +13,7 @@ import { CatchEvent } from '../models/Event';
 import { getAllEvents } from '../storage/localDB';
 import { getCurrentPosition } from '../services/gpsService';
 import { fetchWeatherData, fetchWindHistory, fetchPressureHistory } from '../services/weatherService';
+import { fetchPreyData } from '../services/weatherWaterService';
 import { computeHydroScore } from '../agents/hydrodynamicAgent';
 import { HydroScore } from '../models/Event';
 import { getScoreColor, getScoreLabel } from '../utils/scoring';
@@ -30,6 +31,15 @@ interface MarkerData {
   visible: boolean;
 }
 
+// Maps chlorophyll µg/L to a green-scale color for the prey circle
+function getPreyCircleColor(chl: number, opacity: number): string {
+  const hex = Math.round(opacity * 255).toString(16).padStart(2, '0');
+  if (chl >= 2 && chl <= 8) return `#00e676${hex}`; // bright green — productive zone
+  if (chl >= 0.5 && chl < 2)  return `#69f0ae${hex}`; // light green — low productivity
+  if (chl > 8)                 return `#ffab00${hex}`; // amber — high bloom, baitfish may disperse
+  return `#546e7a${hex}`;                              // grey — very low
+}
+
 export default function MapScreen() {
   const [events, setEvents] = useState<CatchEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,6 +53,7 @@ export default function MapScreen() {
   } | null>(null);
   const [computingScore, setComputingScore] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CatchEvent | null>(null);
+  const [preyData, setPreyData] = useState<{ chlorophyll: number | null; turbidity: number | null } | null>(null);
 
   const mapRef = useRef<MapView>(null);
   const replayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -127,16 +138,19 @@ export default function MapScreen() {
 
       setScoringLocation({ lat, lng });
 
-      const [weather, windHistory, pressureHistory] = await Promise.all([
+      const [weather, windHistory, pressureHistory, prey] = await Promise.all([
         fetchWeatherData(lat, lng),
         fetchWindHistory(lat, lng),
         fetchPressureHistory(lat, lng),
+        fetchPreyData(lat, lng),
       ]);
 
       if (!weather) {
         Alert.alert('Weather Unavailable', 'Could not fetch conditions for scoring.');
         return;
       }
+
+      setPreyData(prey);
 
       const score = computeHydroScore({
         windSpeed: weather.windSpeed,
@@ -147,6 +161,8 @@ export default function MapScreen() {
         pressure: weather.pressure,
         lat,
         lng,
+        chlorophyll: prey.chlorophyll,
+        turbidity: prey.turbidity,
         windHistory,
         pressureHistory,
       });
@@ -238,6 +254,20 @@ export default function MapScreen() {
             strokeWidth={2}
           />
         )}
+
+        {/* Prey availability circle (green = high chlorophyll / baitfish zone) */}
+        {preyData && preyData.chlorophyll != null && scoringLocation && (
+          <Circle
+            center={{
+              latitude: scoringLocation.lat,
+              longitude: scoringLocation.lng,
+            }}
+            radius={3200}
+            fillColor={getPreyCircleColor(preyData.chlorophyll, 0.18)}
+            strokeColor={getPreyCircleColor(preyData.chlorophyll, 0.8)}
+            strokeWidth={1}
+          />
+        )}
       </MapView>
 
       {/* Top controls */}
@@ -268,7 +298,17 @@ export default function MapScreen() {
           <Text style={styles.scoreBannerReasoning} numberOfLines={2}>
             {currentScore.reasoning}
           </Text>
-          <TouchableOpacity onPress={() => setCurrentScore(null)}>
+          {preyData && (
+            <Text style={styles.preyReadout}>
+              {preyData.chlorophyll != null
+                ? `Chlorophyll: ${preyData.chlorophyll.toFixed(1)} µg/L`
+                : 'Chlorophyll: no satellite data'}
+              {preyData.turbidity != null
+                ? `  ·  Turbidity: ${preyData.turbidity.toFixed(3)} mg/L`
+                : ''}
+            </Text>
+          )}
+          <TouchableOpacity onPress={() => { setCurrentScore(null); setPreyData(null); }}>
             <Text style={styles.dismissText}>Dismiss</Text>
           </TouchableOpacity>
         </View>
@@ -435,6 +475,11 @@ const styles = StyleSheet.create({
     color: '#c0d0e0',
     fontSize: 12,
     lineHeight: 16,
+    marginBottom: 6,
+  },
+  preyReadout: {
+    color: '#69f0ae',
+    fontSize: 11,
     marginBottom: 6,
   },
   dismissText: {

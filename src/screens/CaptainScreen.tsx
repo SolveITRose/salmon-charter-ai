@@ -10,6 +10,7 @@ import {
   Share,
   Linking,
   Image,
+  Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -27,8 +28,8 @@ import { formatEventCode, formatTimestamp, formatGPS } from '../utils/formatters
 import { getScoreColor, getScoreLabel } from '../utils/scoring';
 import WeatherWidget from '../components/WeatherWidget';
 import HydroScoreCard from '../components/HydroScoreCard';
-import { fetchTripConditions, TripConditions } from '../services/weatherWaterService';
-import { saveTripConditions } from '../storage/localDB';
+import { fetchTripConditions, fetchPreyData, TripConditions } from '../services/weatherWaterService';
+import { saveTripConditions, updateEvent, getPendingBiteEvents } from '../storage/localDB';
 import WeatherWaterCard from '../components/WeatherWaterCard';
 
 const COUNTER_KEY = 'event_counter';
@@ -43,10 +44,13 @@ export default function CaptainScreen() {
   const [tripConditions, setTripConditions] = useState<TripConditions | null>(null);
   const [tripConditionsLoading, setTripConditionsLoading] = useState(false);
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
+  const [pendingBites, setPendingBites] = useState<CatchEvent[]>([]);
+  const [fishOnLoading, setFishOnLoading] = useState(false);
   const cancelledRef = useRef(false);
 
   useEffect(() => {
     loadTripConditions();
+    loadPendingBites();
   }, []);
 
   const loadTripConditions = async () => {
@@ -100,9 +104,85 @@ export default function CaptainScreen() {
     setProcessingStep('');
   }, []);
 
+  const loadPendingBites = useCallback(async () => {
+    const bites = await getPendingBiteEvents();
+    setPendingBites(bites);
+  }, []);
+
+  const handleFishOn = useCallback(async () => {
+    setFishOnLoading(true);
+    try {
+      const [gps, counter] = await Promise.all([
+        getCurrentPosition(),
+        getNextCounter(),
+      ]);
+      const gpsData = gps || defaultGps();
+      const catchLat = gpsData.lat || 44.88702;
+      const catchLng = gpsData.lng || -80.066101;
+
+      const [weather, windHistory, pressureHistory, prey] = await Promise.all([
+        fetchWeatherData(catchLat, catchLng),
+        fetchWindHistory(catchLat, catchLng),
+        fetchPressureHistory(catchLat, catchLng),
+        fetchPreyData(catchLat, catchLng),
+      ]);
+
+      const weatherData = weather || defaultWeather();
+      const hydroScore = computeHydroScore({
+        windSpeed: weatherData.windSpeed,
+        windDirection: weatherData.windDirection,
+        waveHeight: weatherData.waveHeight,
+        airTemp: weatherData.airTemp,
+        waterTemp: weatherData.waterTemp,
+        pressure: weatherData.pressure,
+        lat: gpsData.lat,
+        lng: gpsData.lng,
+        chlorophyll: prey.chlorophyll,
+        turbidity: prey.turbidity,
+        windHistory,
+        pressureHistory,
+      });
+
+      const eventCode = formatEventCode(counter);
+      const now = new Date().toISOString();
+
+      const event: CatchEvent = {
+        id: uuid.v4() as string,
+        eventCode,
+        timestamp: now,
+        status: 'bite',
+        biteTimestamp: now,
+        photo: '',
+        gps: gpsData,
+        weather: weatherData,
+        setup: { downriggerDepth: 0, lureType: '', lureColor: '', lineWeight: '', trollingSpeed: 0, rodReel: '' },
+        voiceNote: { audioPath: '', transcript: '', duration: 0 },
+        hydroScore,
+        species: '',
+        confidence: 0,
+        sizeEstimate: '',
+        notes: '',
+        weightLbsEstimate: null,
+        synced: false,
+      };
+
+      await insertEvent(event);
+      await loadPendingBites();
+      Alert.alert('Fish On! 🎣', 'Bite marked! Add photo when ready.');
+    } catch (error) {
+      console.error('[Captain] handleFishOn error:', error);
+      Alert.alert('Error', 'Failed to record bite. Try again.');
+    } finally {
+      setFishOnLoading(false);
+    }
+  }, [loadPendingBites]);
+
   const handleLogCatch = useCallback(async () => {
     try {
-      const pickerResult = await ImagePicker.launchCameraAsync({
+      const launch = Platform.OS === 'web'
+        ? ImagePicker.launchImageLibraryAsync
+        : ImagePicker.launchCameraAsync;
+      const pickerResult = await launch({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 0.8,
         allowsEditing: false,
@@ -124,7 +204,10 @@ export default function CaptainScreen() {
     setScreenState('home');
     // Re-launch camera immediately
     try {
-      const pickerResult = await ImagePicker.launchCameraAsync({
+      const launch = Platform.OS === 'web'
+        ? ImagePicker.launchImageLibraryAsync
+        : ImagePicker.launchCameraAsync;
+      const pickerResult = await launch({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 0.8,
         allowsEditing: false,
@@ -141,15 +224,67 @@ export default function CaptainScreen() {
     }
   }, []);
 
-  const handleUsePhoto = useCallback(async () => {
-    if (!pendingPhotoUri) return;
-    const photoUri = pendingPhotoUri;
+  const processLinkedCatch = useCallback(async (photoUri: string, biteEvent: CatchEvent) => {
+    cancelledRef.current = false;
+    setScreenState('processing');
+    setProcessingStep('Identifying species...');
+    try {
+      const savedPhotoPath = await saveEventPhoto(biteEvent.eventCode, photoUri);
+
+      const classifyWithTimeout = Promise.race([
+        classifyCatch(savedPhotoPath),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 30000)
+        ),
+      ]);
+
+      let classification;
+      try {
+        classification = await classifyWithTimeout;
+      } catch {
+        classification = {
+          species: 'Unknown',
+          confidence: 0,
+          sizeEstimate: 'Unknown',
+          notes: 'AI identification timed out — please identify manually.',
+          lengthCm: null,
+          girthCm: null,
+          weightLbsEstimate: null,
+        };
+      }
+
+      if (cancelledRef.current) return;
+      setProcessingStep('Saving event...');
+
+      const updatedEvent: CatchEvent = {
+        ...biteEvent,
+        photo: savedPhotoPath,
+        status: 'landed',
+        species: classification.species,
+        confidence: classification.confidence,
+        sizeEstimate: classification.sizeEstimate,
+        notes: classification.notes,
+        weightLbsEstimate: classification.weightLbsEstimate,
+      };
+
+      await updateEvent(updatedEvent);
+      await saveEventSnapshot(updatedEvent);
+      setCurrentEvent(updatedEvent);
+      setScreenState('result');
+      await loadPendingBites();
+      syncAllPending().catch(console.error);
+    } catch (error) {
+      console.error('[Captain] processLinkedCatch error:', error);
+      setScreenState('home');
+      Alert.alert('Error', 'Failed to log catch. Please try again.', [{ text: 'OK' }]);
+    }
+  }, [loadPendingBites]);
+
+  const processNewCatch = useCallback(async (photoUri: string) => {
     cancelledRef.current = false;
     setScreenState('processing');
     setProcessingStep('Capturing location...');
     try {
-
-      // Parallel: GPS + weather
       const [gps, counter] = await Promise.all([
         getCurrentPosition(),
         getNextCounter(),
@@ -161,14 +296,13 @@ export default function CaptainScreen() {
 
       setProcessingStep('Fetching weather data...');
 
-      // Fetch weather and history in parallel
-      const [weather, windHistory, pressureHistory] = await Promise.all([
-        fetchWeatherData(
-          gpsData.lat || 44.88702,
-          gpsData.lng || -80.066101
-        ),
-        fetchWindHistory(gpsData.lat || 44.88702, gpsData.lng || -80.066101),
-        fetchPressureHistory(gpsData.lat || 44.88702, gpsData.lng || -80.066101),
+      const catchLat = gpsData.lat || 44.88702;
+      const catchLng = gpsData.lng || -80.066101;
+      const [weather, windHistory, pressureHistory, prey] = await Promise.all([
+        fetchWeatherData(catchLat, catchLng),
+        fetchWindHistory(catchLat, catchLng),
+        fetchPressureHistory(catchLat, catchLng),
+        fetchPreyData(catchLat, catchLng),
       ]);
 
       if (cancelledRef.current) return;
@@ -176,7 +310,7 @@ export default function CaptainScreen() {
 
       setProcessingStep('Computing HydroScore...');
 
-      const hydroInput = {
+      const hydroScore = computeHydroScore({
         windSpeed: weatherData.windSpeed,
         windDirection: weatherData.windDirection,
         waveHeight: weatherData.waveHeight,
@@ -185,18 +319,16 @@ export default function CaptainScreen() {
         pressure: weatherData.pressure,
         lat: gpsData.lat,
         lng: gpsData.lng,
+        chlorophyll: prey.chlorophyll,
+        turbidity: prey.turbidity,
         windHistory,
         pressureHistory,
-      };
-
-      const hydroScore = computeHydroScore(hydroInput);
+      });
 
       setProcessingStep('Identifying species...');
 
-      // Save photo to event folder first
       const savedPhotoPath = await saveEventPhoto(eventCode, photoUri);
 
-      // Run classifier with 30-second timeout
       const classifyWithTimeout = Promise.race([
         classifyCatch(savedPhotoPath),
         new Promise<never>((_, reject) =>
@@ -226,22 +358,12 @@ export default function CaptainScreen() {
         id: uuid.v4() as string,
         eventCode,
         timestamp: new Date().toISOString(),
+        status: 'landed',
         photo: savedPhotoPath,
         gps: gpsData,
         weather: weatherData,
-        setup: {
-          downriggerDepth: 0,
-          lureType: '',
-          lureColor: '',
-          lineWeight: '',
-          trollingSpeed: 0,
-          rodReel: '',
-        },
-        voiceNote: {
-          audioPath: '',
-          transcript: '',
-          duration: 0,
-        },
+        setup: { downriggerDepth: 0, lureType: '', lureColor: '', lineWeight: '', trollingSpeed: 0, rodReel: '' },
+        voiceNote: { audioPath: '', transcript: '', duration: 0 },
         hydroScore,
         species: classification.species,
         confidence: classification.confidence,
@@ -253,22 +375,36 @@ export default function CaptainScreen() {
 
       await insertEvent(event);
       await saveEventSnapshot(event);
-
       setCurrentEvent(event);
       setScreenState('result');
-
-      // Background sync attempt
       syncAllPending().catch(console.error);
     } catch (error) {
-      console.error('[Captain] handleUsePhoto error:', error);
+      console.error('[Captain] processNewCatch error:', error);
       setScreenState('home');
-      Alert.alert(
-        'Error',
-        'Failed to log catch. Please try again.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Error', 'Failed to log catch. Please try again.', [{ text: 'OK' }]);
     }
-  }, [pendingPhotoUri]);
+  }, []);
+
+  const handleUsePhoto = useCallback(async () => {
+    if (!pendingPhotoUri) return;
+    const photoUri = pendingPhotoUri;
+
+    if (pendingBites.length > 0) {
+      const bite = pendingBites[0];
+      const biteTime = formatTimestamp(bite.biteTimestamp || bite.timestamp);
+      Alert.alert(
+        'Link to Fish On event?',
+        `Hooked: ${biteTime}\nCode: ${bite.eventCode}`,
+        [
+          { text: 'Link to this bite', onPress: () => processLinkedCatch(photoUri, bite) },
+          { text: 'New event', style: 'cancel', onPress: () => processNewCatch(photoUri) },
+        ]
+      );
+      return;
+    }
+
+    processNewCatch(photoUri);
+  }, [pendingPhotoUri, pendingBites, processLinkedCatch, processNewCatch]);
 
   const handleShareCode = useCallback(async () => {
     if (!currentEvent) return;
@@ -301,7 +437,8 @@ export default function CaptainScreen() {
     setCurrentEvent(null);
     setScreenState('home');
     setProcessingStep('');
-  }, []);
+    loadPendingBites();
+  }, [loadPendingBites]);
 
   // ─── Render: Home ──────────────────────────────────────────────────────────
   if (screenState === 'home') {
@@ -317,6 +454,36 @@ export default function CaptainScreen() {
           loading={tripConditionsLoading}
           onRetry={loadTripConditions}
         />
+
+        <TouchableOpacity
+          style={[styles.fishOnButton, fishOnLoading && styles.fishOnButtonDisabled]}
+          onPress={handleFishOn}
+          activeOpacity={0.8}
+          disabled={fishOnLoading}
+        >
+          <Text style={styles.fishOnIcon}>🎣</Text>
+          <Text style={styles.fishOnText}>
+            {fishOnLoading ? 'Capturing...' : 'FISH ON!'}
+          </Text>
+          <Text style={styles.fishOnSub}>Tap the moment a fish strikes</Text>
+        </TouchableOpacity>
+
+        {pendingBites.length > 0 && (
+          <TouchableOpacity
+            style={styles.pendingBitesBar}
+            onPress={() => {
+              const lines = pendingBites
+                .map((b, i) => `${i + 1}. ${b.eventCode} — hooked ${formatTimestamp(b.biteTimestamp || b.timestamp)}`)
+                .join('\n');
+              Alert.alert(`${pendingBites.length} fish pending photo`, lines);
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.pendingBitesText}>
+              🐟 {pendingBites.length} fish pending photo — tap for details
+            </Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={styles.logCatchButton}
@@ -515,6 +682,52 @@ const styles = StyleSheet.create({
   heroSubtitle: {
     color: '#8899aa',
     fontSize: 16,
+  },
+  fishOnButton: {
+    backgroundColor: '#e65100',
+    marginHorizontal: 24,
+    borderRadius: 16,
+    padding: 28,
+    alignItems: 'center',
+    marginBottom: 12,
+    shadowColor: '#ff6d00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  fishOnButtonDisabled: {
+    opacity: 0.6,
+  },
+  fishOnIcon: {
+    fontSize: 48,
+    marginBottom: 8,
+  },
+  fishOnText: {
+    color: '#ffffff',
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    letterSpacing: 1,
+  },
+  fishOnSub: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 13,
+  },
+  pendingBitesBar: {
+    backgroundColor: '#1a2a10',
+    marginHorizontal: 24,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#4caf50',
+  },
+  pendingBitesText: {
+    color: '#69f0ae',
+    fontSize: 13,
+    textAlign: 'center',
   },
   logCatchButton: {
     backgroundColor: '#1e90ff',

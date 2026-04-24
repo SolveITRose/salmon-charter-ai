@@ -9,3 +9,6 @@ expo-env.d.ts
 .env.local
 .env*.local
 node_modules/
+dist/
+.expo/web/cache/
+.claude/

@@ -6,10 +6,13 @@ import {
   TextInput,
   StyleSheet,
   Alert,
+  Platform,
 } from 'react-native';
-import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system/legacy';
 import { formatDuration } from '../utils/formatters';
+
+// Audio recording is mobile-only; imports skipped on web to avoid bundler errors
+const Audio = Platform.OS !== 'web' ? require('expo-av').Audio : null;
+const FileSystem = Platform.OS !== 'web' ? require('expo-file-system/legacy') : null;
 
 interface VoiceInputProps {
   onTranscriptComplete: (
@@ -29,7 +32,7 @@ export default function VoiceInput({ onTranscriptComplete, disabled }: VoiceInpu
   const [audioPath, setAudioPath] = useState('');
   const [audioDuration, setAudioDuration] = useState(0);
 
-  const recordingRef = useRef<Audio.Recording | null>(null);
+  const recordingRef = useRef<any>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -42,6 +45,10 @@ export default function VoiceInput({ onTranscriptComplete, disabled }: VoiceInpu
   }, []);
 
   const startRecording = async () => {
+    if (!Audio) {
+      Alert.alert('Not Available', 'Voice recording is only available on the mobile app.');
+      return;
+    }
     try {
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== 'granted') {

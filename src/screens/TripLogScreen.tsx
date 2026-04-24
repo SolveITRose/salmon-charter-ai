@@ -11,8 +11,10 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Platform,
 } from 'react-native';
-import { Audio } from 'expo-av';
+
+const Audio = Platform.OS !== 'web' ? require('expo-av').Audio : null;
 
 import { CatchEvent } from '../models/Event';
 import { getAllEvents } from '../storage/localDB';
@@ -36,7 +38,7 @@ export default function TripLogScreen() {
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [insight, setInsight] = useState('');
   const [insightLoading, setInsightLoading] = useState(false);
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [sound, setSound] = useState<any>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
 
   const loadEvents = useCallback(async () => {
@@ -102,7 +104,7 @@ export default function TripLogScreen() {
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri: audioPath },
         { shouldPlay: true },
-        (status) => {
+        (status: any) => {
           if ('didJustFinish' in status && status.didJustFinish) {
             setIsPlayingAudio(false);
           }

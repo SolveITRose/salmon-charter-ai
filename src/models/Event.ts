@@ -40,6 +40,7 @@ export interface HydroScore {
   residenceTime: number;          // 0-20
   stormPulse: number;             // 0-20
   shorelineWetland: number;       // 0-15
+  preyAvailability: number;       // 0-15 (satellite chlorophyll + turbidity)
   confidence: 'low' | 'medium' | 'high';
   hotspotProbability: number;     // 0-1
   reasoning: string;
@@ -49,6 +50,8 @@ export interface CatchEvent {
   id: string;
   eventCode: string;
   timestamp: string;
+  status?: 'bite' | 'landed'; // 'bite' = hooked, no photo yet; 'landed' = photo attached
+  biteTimestamp?: string;      // ISO8601 — when Fish On was tapped
   photo: string;              // local file path
   gps: GpsData;
   weather: WeatherData;

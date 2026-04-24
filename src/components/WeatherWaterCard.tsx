@@ -41,6 +41,37 @@ function moonEmoji(label: string | null): string {
   }
 }
 
+// WMO cloud modification factor for UV: CMF = 1 - 0.75 * (cloud_fraction)^3.4
+// Accounts for the fact that heavy overcast still transmits ~25-35% of UV.
+function attenuatedUV(uv: number | null, cloudPct: number | null): number | null {
+  if (uv === null) return null;
+  if (cloudPct === null || cloudPct <= 0) return uv;
+  const cmf = 1 - 0.75 * Math.pow(cloudPct / 100, 3.4);
+  return Math.round(uv * cmf * 10) / 10;
+}
+
+function uvLabel(uv: number): string {
+  if (uv <= 2) return 'Low';
+  if (uv <= 5) return 'Moderate';
+  if (uv <= 7) return 'High';
+  if (uv <= 10) return 'Very High';
+  return 'Extreme';
+}
+
+function chlLabel(chl: number): string {
+  if (chl >= 2 && chl <= 8) return 'Productive';
+  if (chl >= 0.5 && chl < 2) return 'Low';
+  if (chl > 8) return 'High bloom';
+  return 'Very low';
+}
+
+function turbLabel(sm: number): string {
+  if (sm >= 0.01 && sm <= 0.08) return 'Slight (smelt habitat)';
+  if (sm > 0.08 && sm <= 0.15) return 'Moderate';
+  if (sm > 0.15) return 'High';
+  return 'Very clear';
+}
+
 function trendArrow(trend: TripConditions['pressure_trend']): string {
   if (trend === 'rising')  return ' ↑';
   if (trend === 'falling') return ' ↓';
@@ -207,11 +238,10 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
         />
         <Row
           label="UV Index"
-          value={
-            conditions.uv_index !== null
-              ? `${conditions.uv_index} · ${conditions.uv_index_label ?? ''}`
-              : '—'
-          }
+          value={(() => {
+            const uv = attenuatedUV(conditions.uv_index, conditions.cloud_cover_pct);
+            return uv !== null ? `${uv} · ${uvLabel(uv)}` : '—';
+          })()}
         />
       </Section>
 
@@ -285,7 +315,27 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
         </TouchableOpacity>
       </Section>
 
-      {/* 3. Lunar */}
+      {/* 4. Food Chain */}
+      <Section title="Food Chain (Satellite)">
+        <Row
+          label="Chlorophyll-a"
+          value={
+            conditions.chlorophyll_ug_l !== null
+              ? `${conditions.chlorophyll_ug_l} µg/L · ${chlLabel(conditions.chlorophyll_ug_l)}`
+              : 'No data (cloud cover)'
+          }
+        />
+        <Row
+          label="Turbidity"
+          value={
+            conditions.turbidity_mg_l !== null
+              ? `${conditions.turbidity_mg_l} mg/L · ${turbLabel(conditions.turbidity_mg_l)}`
+              : 'No data'
+          }
+        />
+      </Section>
+
+      {/* 5. Lunar */}
       <Section title="Lunar">
         <Row
           label="Moon Phase"
@@ -301,7 +351,7 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
         <Row label="Sunset"   value={dash(conditions.sunset_time)} />
       </Section>
 
-      {/* 4. Feeding Windows */}
+      {/* 6. Feeding Windows */}
       <Section title="Feeding Windows">
         <View style={styles.ratingRow}>
           <Text style={styles.rowLabel}>Day Rating</Text>

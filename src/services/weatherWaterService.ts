@@ -27,6 +27,8 @@ export interface TripConditions {
   current_direction_label: string | null;
   sst_buoy_c: number | null;
   sst_satellite_c: number | null;
+  chlorophyll_ug_l: number | null;  // Satellite chlorophyll-a (µg/L), proxy for phytoplankton
+  turbidity_mg_l: number | null;    // Suspended minerals (mg/L), proxy for baitfish habitat
   moon_phase_value: number | null;
   moon_phase_label: string | null;
   moonrise_time: string | null;
@@ -509,6 +511,64 @@ async function fetchGLERL(lat: number, lng: number): Promise<Partial<TripConditi
   }
 }
 
+// ── D2. GLERL Chlorophyll + Turbidity (food chain data) ──────────────────
+
+const LAKE_ERDDAP_PREFIX: Record<string, string> = {
+  georgian_bay: 'LH',
+  huron:        'LH',
+  superior:     'LS',
+  michigan:     'LM',
+  erie:         'LE',
+  ontario:      'LO',
+};
+
+async function extractErddapValue(url: string, columnName: string): Promise<number | null> {
+  try {
+    const res = await fetchWithTimeout(url, {}, 12000);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const table = data?.table;
+    if (!table) return null;
+    const colNames: string[] = table.columnNames ?? [];
+    const idx = colNames.indexOf(columnName);
+    if (idx === -1) return null;
+    const rows: Array<Array<unknown>> = table.rows ?? [];
+    const values = rows
+      .map((r) => r[idx])
+      .filter((v): v is number => typeof v === 'number' && !isNaN(v));
+    if (!values.length) return null;
+    return r1(values.reduce((a, b) => a + b, 0) / values.length);
+  } catch {
+    return null;
+  }
+}
+
+async function fetchChlorophyllTurbidity(
+  lat: number,
+  lng: number,
+  lakeId: string,
+): Promise<{ chlorophyll_ug_l: number | null; turbidity_mg_l: number | null }> {
+  const prefix = LAKE_ERDDAP_PREFIX[lakeId] ?? 'LH';
+  const lat0 = (lat - 0.1).toFixed(4);
+  const lat1 = (lat + 0.1).toFixed(4);
+  const lng0 = (lng - 0.1).toFixed(4);
+  const lng1 = (lng + 0.1).toFixed(4);
+  const base = 'https://apps.glerl.noaa.gov/erddap/griddap';
+
+  const [chlorophyll_ug_l, turbidity_mg_l] = await Promise.all([
+    extractErddapValue(
+      `${base}/${prefix}_CHL_NRT.json?Chlorophyll[(last)][(${lat0}):(${lat1})][(${lng0}):(${lng1})]`,
+      'Chlorophyll',
+    ),
+    extractErddapValue(
+      `${base}/${prefix}_SM_VIIRS_Monthly_Avg.json?Suspended_Minerals[(last)][(${lat0}):(${lat1})][(${lng0}):(${lng1})]`,
+      'Suspended_Minerals',
+    ),
+  ]);
+
+  return { chlorophyll_ug_l, turbidity_mg_l };
+}
+
 // ── E. NWS Marine Alerts ───────────────────────────────────────────────────
 
 const MARINE_WARNING_EVENTS = [
@@ -596,12 +656,13 @@ export async function fetchTripConditions(
 ): Promise<TripConditions> {
   const { lakeId, stationId } = determineLake(lat, lng);
 
-  const [ndbcRaw, owm, owmAtmo, solunar, glerl, nws, uv, prevWind, astro, currents] = await Promise.all([
+  const [ndbcRaw, owm, owmAtmo, solunar, glerl, prey, nws, uv, prevWind, astro, currents] = await Promise.all([
     fetchNDBC(stationId),
     fetchOWM(lat, lng),
     fetchOWMAtmospheric(lat, lng),
     fetchSolunar(lat, lng, date),
     fetchGLERL(lat, lng),
+    fetchChlorophyllTurbidity(lat, lng, lakeId),
     fetchNWSAlerts(lat, lng),
     fetchUVIndex(lat, lng),
     fetchPreviousWind(lat, lng),
@@ -638,6 +699,8 @@ export async function fetchTripConditions(
     current_direction_label:  currents.current_direction_label ?? null,
     sst_buoy_c:               ndbc.sst_buoy_c               ?? null,
     sst_satellite_c:          glerl.sst_satellite_c         ?? null,
+    chlorophyll_ug_l:         prey.chlorophyll_ug_l         ?? null,
+    turbidity_mg_l:           prey.turbidity_mg_l           ?? null,
     moon_phase_value:         owm.moon_phase_value          ?? calcMoonPhase(new Date()),
     moon_phase_label:         owm.moon_phase_label          ?? moonPhaseLabelFrom(owm.moon_phase_value ?? calcMoonPhase(new Date())),
     moonrise_time:            astro.moonrise ?? null,
@@ -664,4 +727,15 @@ export async function fetchTripConditions(
     marine_warning_text:      nws.marine_warning_text       ?? null,
     atmospheric_source:       usingFallback ? 'owm' : 'ndbc',
   };
+}
+
+// ── Lightweight prey data fetch (for MapScreen) ────────────────────────────
+
+export async function fetchPreyData(
+  lat: number,
+  lng: number,
+): Promise<{ chlorophyll: number | null; turbidity: number | null }> {
+  const { lakeId } = determineLake(lat, lng);
+  const { chlorophyll_ug_l, turbidity_mg_l } = await fetchChlorophyllTurbidity(lat, lng, lakeId);
+  return { chlorophyll: chlorophyll_ug_l, turbidity: turbidity_mg_l };
 }

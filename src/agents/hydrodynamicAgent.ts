@@ -18,6 +18,10 @@ export interface HydroInput {
   lat: number;
   lng: number;
 
+  // Satellite food chain data (optional — null when cloud cover blocks sensor)
+  chlorophyll?: number | null;  // µg/L — phytoplankton proxy
+  turbidity?: number | null;    // mg/L suspended minerals — baitfish habitat proxy
+
   // Historical data (last 48h, ordered oldest-first)
   windHistory: Array<{
     windSpeed: number;
@@ -286,6 +290,40 @@ function isWithinGeorgianBayShore(
   return false;
 }
 
+/**
+ * Prey Availability Score (max 15, bonus — capped at 100 in total)
+ * Uses satellite chlorophyll-a and suspended minerals to estimate food chain productivity.
+ * Chain: phytoplankton → zooplankton → smelt/shiners → salmon/trout.
+ * Returns 0 when satellite data is unavailable (cloud cover).
+ */
+function calcPreyAvailability(input: HydroInput): number {
+  // Chlorophyll score (0-10): Georgian Bay productive range is 2-8 µg/L
+  let chlScore = 0;
+  if (input.chlorophyll != null && input.chlorophyll > 0) {
+    if (input.chlorophyll >= 2 && input.chlorophyll <= 8) {
+      chlScore = 10; // Peak zooplankton zone — smelt/shiners actively feeding
+    } else if (input.chlorophyll >= 0.5 && input.chlorophyll < 2) {
+      chlScore = 5;  // Low productivity, some forage present
+    } else if (input.chlorophyll > 8) {
+      chlScore = clamp(10 - (input.chlorophyll - 8), 0, 10); // High bloom can disperse baitfish
+    }
+  }
+
+  // Turbidity score (0-5): smelt prefer slightly turbid water (0.01-0.08 mg/L)
+  // Very clear water = poor camouflage for prey; very murky = poor feeding light
+  let smScore = 0;
+  if (input.turbidity != null && input.turbidity > 0) {
+    if (input.turbidity >= 0.01 && input.turbidity <= 0.08) {
+      smScore = 5; // Ideal smelt habitat
+    } else if (input.turbidity > 0.08 && input.turbidity <= 0.15) {
+      smScore = 2; // Moderate — baitfish still present
+    }
+    // <0.01 (too clear) or >0.15 (too murky): 0 pts
+  }
+
+  return clamp(chlScore + smScore, 0, 15);
+}
+
 // ─── Confidence Calculation ──────────────────────────────────────────────────
 
 function calcConfidence(
@@ -326,6 +364,7 @@ function buildReasoning(
     residenceTime: number;
     stormPulse: number;
     shorelineWetland: number;
+    preyAvailability: number;
     total: number;
   }
 ): string {
@@ -358,6 +397,14 @@ function buildReasoning(
     parts.push('Position near wetland/shoreline nutrient zone.');
   }
 
+  if (scores.preyAvailability >= 10) {
+    parts.push(`High food chain activity (chlorophyll ${input.chlorophyll?.toFixed(1) ?? '?'} µg/L) — smelt and shiners likely nearby.`);
+  } else if (scores.preyAvailability >= 5) {
+    parts.push('Moderate prey availability detected via satellite.');
+  } else if (input.chlorophyll == null) {
+    parts.push('Prey data unavailable (satellite blocked by cloud cover).');
+  }
+
   if (scores.total >= 70) {
     parts.push('Overall: HIGH PROBABILITY HOTSPOT — excellent salmon conditions.');
   } else if (scores.total >= 50) {
@@ -382,13 +429,15 @@ export function computeHydroScore(input: HydroInput): HydroScore {
   const residenceTime = calcResidenceTime(input);
   const stormPulse = calcStormPulse(input);
   const shorelineWetland = calcShorelineWetland(input);
+  const preyAvailability = calcPreyAvailability(input);
 
   const total = clamp(
     windTransport +
       mixingStratification +
       residenceTime +
       stormPulse +
-      shorelineWetland,
+      shorelineWetland +
+      preyAvailability,
     0,
     100
   );
@@ -402,6 +451,7 @@ export function computeHydroScore(input: HydroInput): HydroScore {
     residenceTime,
     stormPulse,
     shorelineWetland,
+    preyAvailability,
     total,
   });
 
@@ -412,6 +462,7 @@ export function computeHydroScore(input: HydroInput): HydroScore {
     residenceTime,
     stormPulse,
     shorelineWetland,
+    preyAvailability,
     confidence,
     hotspotProbability,
     reasoning,
@@ -429,6 +480,7 @@ export function defaultHydroScore(): HydroScore {
     residenceTime: 0,
     stormPulse: 0,
     shorelineWetland: 0,
+    preyAvailability: 0,
     confidence: 'low',
     hotspotProbability: 0,
     reasoning: 'Insufficient data to compute HydroScore.',

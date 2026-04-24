@@ -232,6 +232,14 @@ export async function markSynced(
 }
 
 /**
+ * Returns all events with status 'bite' (hooked but not yet photographed), newest first.
+ */
+export async function getPendingBiteEvents(): Promise<CatchEvent[]> {
+  const all = await getAllEvents();
+  return all.filter((e) => e.status === 'bite');
+}
+
+/**
  * Delete an event by id.
  */
 export async function deleteEvent(id: string): Promise<void> {

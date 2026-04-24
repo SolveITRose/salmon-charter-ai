@@ -112,6 +112,11 @@ const HydroScoreCard = memo(function HydroScoreCard({
             value={hydroScore.shorelineWetland}
             max={15}
           />
+          <SubScoreRow
+            label="Prey"
+            value={hydroScore.preyAvailability ?? 0}
+            max={15}
+          />
         </View>
       )}
 
