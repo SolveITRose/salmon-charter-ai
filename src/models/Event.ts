@@ -18,6 +18,15 @@ export interface WeatherData {
   fetchedAt: string;       // ISO8601
 }
 
+export interface FishFinderData {
+  waterTemp?: number;        // °C
+  depth?: number;            // ft
+  speedOverGround?: number;  // mph
+  courseOverGround?: number; // degrees
+  heading?: number;          // degrees
+  baitOnScreen?: boolean;
+}
+
 export interface SetupData {
   downriggerDepth: number;   // feet
   backFromBall?: number;     // feet back from downrigger ball
@@ -51,6 +60,7 @@ export interface HydroScore {
 
 export interface CatchEvent {
   id: string;
+  fishFinder?: FishFinderData;
   eventCode: string;
   timestamp: string;
   status?: 'bite' | 'landed'; // 'bite' = hooked, no photo yet; 'landed' = photo attached

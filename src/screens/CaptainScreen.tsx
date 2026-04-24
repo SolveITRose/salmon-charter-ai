@@ -9,13 +9,14 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import uuid from 'react-native-uuid';
 
-import { CatchEvent, GpsData, WeatherData } from '../models/Event';
+import { CatchEvent, FishFinderData, GpsData, WeatherData } from '../models/Event';
 import { getCurrentPosition } from '../services/gpsService';
 import { fetchWeatherData, fetchWindHistory, fetchPressureHistory } from '../services/weatherService';
 import { computeHydroScore } from '../agents/hydrodynamicAgent';
-import { insertEvent } from '../storage/localDB';
+import { insertEvent, updateEvent } from '../storage/localDB';
 import { formatEventCode, formatTimestamp } from '../utils/formatters';
 import WeatherWaterCard from '../components/WeatherWaterCard';
+import FishFinderModal from '../components/FishFinderModal';
 import { fetchTripConditions, fetchPreyData, TripConditions } from '../services/weatherWaterService';
 import { saveTripConditions, getPendingBiteEvents } from '../storage/localDB';
 
@@ -29,6 +30,7 @@ export default function CaptainScreen() {
   const [fishOnLoading, setFishOnLoading] = useState(false);
   const [fishOnMessage, setFishOnMessage] = useState<string | null>(null);
   const [showBiteList, setShowBiteList] = useState(false);
+  const [fishFinderEvent, setFishFinderEvent] = useState<CatchEvent | null>(null);
 
   useEffect(() => {
     loadTripConditions();
@@ -150,7 +152,7 @@ export default function CaptainScreen() {
       await insertEvent(event);
       await loadPendingBites();
       setShowBiteList(true);
-      setFishOnMessage(`${eventCode} — conditions captured! Mate can now join to add photo.`);
+      setFishFinderEvent(event);
     } catch (error) {
       console.error('[Captain] handleFishOn error:', error);
       setFishOnMessage('Failed to record bite. Try again.');
@@ -159,12 +161,39 @@ export default function CaptainScreen() {
     }
   }, [loadPendingBites]);
 
+  const handleFishFinderSave = useCallback(async (data: FishFinderData) => {
+    if (!fishFinderEvent) return;
+    try {
+      const updated: CatchEvent = { ...fishFinderEvent, fishFinder: data };
+      await updateEvent(updated);
+    } catch (err) {
+      console.error('[Captain] handleFishFinderSave error:', err);
+    } finally {
+      setFishFinderEvent(null);
+      setFishOnMessage(`${fishFinderEvent.eventCode} — conditions captured! Mate can now join to add photo.`);
+    }
+  }, [fishFinderEvent]);
+
+  const handleFishFinderSkip = useCallback(() => {
+    const code = fishFinderEvent?.eventCode ?? '';
+    setFishFinderEvent(null);
+    setFishOnMessage(`${code} — conditions captured! Mate can now join to add photo.`);
+  }, [fishFinderEvent]);
+
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
     >
+      {fishFinderEvent && (
+        <FishFinderModal
+          visible={true}
+          event={fishFinderEvent}
+          onSave={handleFishFinderSave}
+          onSkip={handleFishFinderSkip}
+        />
+      )}
       <WeatherWaterCard
         conditions={tripConditions}
         loading={tripConditionsLoading}
