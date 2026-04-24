@@ -13,7 +13,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 
 const Audio = Platform.OS !== 'web' ? require('expo-av').Audio : null;
 
