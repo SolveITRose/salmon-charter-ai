@@ -91,6 +91,11 @@ export async function getEventCount(): Promise<number> {
   return events.length;
 }
 
+export async function getPendingBiteEvents(): Promise<CatchEvent[]> {
+  const events = await readEvents();
+  return events.filter((e) => e.status === 'bite');
+}
+
 export async function saveTripConditions(
   _tripId: string,
   conditions: TripConditions,
