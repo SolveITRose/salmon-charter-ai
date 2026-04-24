@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -50,7 +49,14 @@ export default function MateScreen() {
   const [voiceDuration, setVoiceDuration] = useState(0);
   const [photoUri, setPhotoUri] = useState('');
   const [savingStep, setSavingStep] = useState('Saving setup data...');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [yourRoleOpen, setYourRoleOpen] = useState(false);
+
+  useEffect(() => {
+    if (!errorMessage) return;
+    const t = setTimeout(() => setErrorMessage(null), 4000);
+    return () => clearTimeout(t);
+  }, [errorMessage]);
 
   const handleJoined = useCallback((event: CatchEvent) => {
     setCurrentEvent(event);
@@ -92,12 +98,22 @@ export default function MateScreen() {
     if (!currentEvent) return;
 
     if (!lureType.trim()) {
-      Alert.alert('Required Field', 'Please enter the lure type.');
+      setErrorMessage('Lure type is required.');
       return;
     }
 
     setSavingStep(photoUri ? 'Identifying species...' : 'Saving setup data...');
     setScreenState('saving');
+
+    const classificationFallback: { species: string; confidence: number; sizeEstimate: string; notes: string; lengthCm: number | null; girthCm: number | null; weightLbsEstimate: number | null } = {
+      species: 'Unknown',
+      confidence: 0,
+      sizeEstimate: 'Unknown',
+      notes: 'AI identification not available.',
+      lengthCm: null,
+      girthCm: null,
+      weightLbsEstimate: null,
+    };
 
     try {
       const setupData: SetupData = {
@@ -123,26 +139,27 @@ export default function MateScreen() {
       };
 
       if (photoUri) {
-        const savedPhotoPath = await saveEventPhoto(currentEvent.eventCode, photoUri);
-        let classification;
-        try {
-          classification = await Promise.race([
-            classifyCatch(savedPhotoPath),
-            new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error('timeout')), 30000)
-            ),
-          ]);
-        } catch {
-          classification = {
-            species: 'Unknown',
-            confidence: 0,
-            sizeEstimate: 'Unknown',
-            notes: 'AI identification timed out — please identify manually.',
-            lengthCm: null,
-            girthCm: null,
-            weightLbsEstimate: null,
-          };
+        const savedPhotoPath = Platform.OS === 'web'
+          ? photoUri
+          : await saveEventPhoto(currentEvent.eventCode, photoUri);
+
+        let classification = classificationFallback;
+        if (Platform.OS !== 'web') {
+          try {
+            classification = await Promise.race([
+              classifyCatch(savedPhotoPath),
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('timeout')), 30000)
+              ),
+            ]);
+          } catch {
+            classification = {
+              ...classificationFallback,
+              notes: 'AI identification timed out — please identify manually.',
+            };
+          }
         }
+
         updatedEvent = {
           ...updatedEvent,
           photo: savedPhotoPath,
@@ -163,7 +180,7 @@ export default function MateScreen() {
     } catch (error) {
       console.error('[Mate] handleSaveSetup error:', error);
       setScreenState('setup');
-      Alert.alert('Save Failed', 'Could not save setup. Please try again.');
+      setErrorMessage('Save failed. Please try again.');
     }
   }, [
     currentEvent,
@@ -502,6 +519,13 @@ export default function MateScreen() {
             />
           </View>
 
+          {/* Inline error message */}
+          {errorMessage && (
+            <TouchableOpacity style={styles.errorBanner} onPress={() => setErrorMessage(null)} activeOpacity={0.8}>
+              <Text style={styles.errorBannerText}>⚠️ {errorMessage}</Text>
+            </TouchableOpacity>
+          )}
+
           {/* Save Button */}
           <TouchableOpacity style={styles.saveButton} onPress={handleSaveSetup} activeOpacity={0.8}>
             <Text style={styles.saveButtonText}>Save Setup</Text>
@@ -758,6 +782,21 @@ const styles = StyleSheet.create({
   chipTextSelected: {
     color: '#1e90ff',
     fontWeight: '700',
+  },
+  errorBanner: {
+    backgroundColor: '#3a1b1b',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#f44336',
+  },
+  errorBannerText: {
+    color: '#ff5252',
+    fontSize: 13,
+    textAlign: 'center',
+    fontWeight: '600',
   },
   saveButton: {
     backgroundColor: '#00c853',
