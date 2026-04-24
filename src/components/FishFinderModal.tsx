@@ -55,6 +55,16 @@ export default function FishFinderModal({ visible, event, onSave, onSkip }: Fish
     if (parsed.baitOnScreen !== undefined) setBaitOnScreen(parsed.baitOnScreen);
   };
 
+  const handlePickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      base64: true,
+      quality: 0.85,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    });
+    if (result.canceled || !result.assets[0].base64) return;
+    await processImage(result.assets[0].uri, result.assets[0].base64!);
+  };
+
   const handleCapture = async () => {
     const result = await ImagePicker.launchCameraAsync({
       base64: true,
@@ -64,22 +74,22 @@ export default function FishFinderModal({ visible, event, onSave, onSkip }: Fish
     if (result.canceled || !result.assets[0].base64) return;
 
     const { uri, base64 } = result.assets[0];
+    await processImage(uri, base64!);
+  };
+
+  const processImage = async (uri: string, base64: string) => {
     setCapturedUri(uri);
     setStep('analyzing');
     setScanError(null);
 
     try {
-      const parsed = await parseFishFinderScreen(base64!);
-      const fieldCount = Object.keys(parsed).length;
-
-      if (fieldCount === 0) throw new Error('No data found');
-
+      const parsed = await parseFishFinderScreen(base64);
+      if (Object.keys(parsed).length === 0) throw new Error('No data found');
       applyParsed(parsed);
       setStep('review');
     } catch {
       const newAttempts = attempts + 1;
       setAttempts(newAttempts);
-
       if (newAttempts >= MAX_ATTEMPTS) {
         setScanError("Couldn't read the screen after 3 attempts. Enter values manually.");
         setStep('review');
@@ -129,7 +139,11 @@ export default function FishFinderModal({ visible, event, onSave, onSkip }: Fish
 
               <TouchableOpacity style={styles.captureButton} onPress={handleCapture} activeOpacity={0.8}>
                 <Text style={styles.captureIcon}>📷</Text>
-                <Text style={styles.captureText}>Capture Screen</Text>
+                <Text style={styles.captureText}>Take Photo</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.libraryButton} onPress={handlePickImage} activeOpacity={0.8}>
+                <Text style={styles.libraryText}>Choose from Library</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.skipLink} onPress={handleSkip}>
@@ -289,6 +303,19 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 17,
     fontWeight: '700',
+  },
+  libraryButton: {
+    borderWidth: 1,
+    borderColor: '#1e90ff',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  libraryText: {
+    color: '#1e90ff',
+    fontSize: 15,
+    fontWeight: '600',
   },
   skipLink: {
     alignItems: 'center',
