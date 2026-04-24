@@ -1,0 +1,36 @@
+name: Deploy to Azure Static Web Apps
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npx expo export --platform web
+        env:
+          EXPO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.EXPO_PUBLIC_ANTHROPIC_API_KEY }}
+          EXPO_PUBLIC_OWM_API_KEY: ${{ secrets.EXPO_PUBLIC_OWM_API_KEY }}
+          EXPO_PUBLIC_SIGNALK_PORT: ${{ secrets.EXPO_PUBLIC_SIGNALK_PORT }}
+
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: dist
+          skip_app_build: true
