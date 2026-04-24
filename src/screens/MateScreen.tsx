@@ -10,10 +10,13 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { CatchEvent, SetupData } from '../models/Event';
 import { updateEvent } from '../storage/localDB';
-import { saveEventSnapshot } from '../storage/eventStore';
+import { saveEventPhoto, saveEventSnapshot } from '../storage/eventStore';
+import { classifyCatch } from '../agents/catchClassifier';
 import { syncAllPending } from '../services/syncService';
 import EventJoinModal from '../components/EventJoinModal';
 import VoiceInput from '../components/VoiceInput';
@@ -40,6 +43,8 @@ export default function MateScreen() {
   const [voiceAudioPath, setVoiceAudioPath] = useState('');
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const [voiceDuration, setVoiceDuration] = useState(0);
+  const [photoUri, setPhotoUri] = useState('');
+  const [savingStep, setSavingStep] = useState('Saving setup data...');
   const [yourRoleOpen, setYourRoleOpen] = useState(false);
 
   const handleJoined = useCallback((event: CatchEvent) => {
@@ -61,6 +66,24 @@ export default function MateScreen() {
     setScreenState('setup');
   }, []);
 
+  const handleTakePhoto = useCallback(async () => {
+    try {
+      const launch = Platform.OS === 'web'
+        ? ImagePicker.launchImageLibraryAsync
+        : ImagePicker.launchCameraAsync;
+      const result = await launch({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+        allowsEditing: false,
+      });
+      if (!result.canceled && result.assets[0]) {
+        setPhotoUri(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('[Mate] handleTakePhoto error:', error);
+    }
+  }, []);
+
   const handleSaveSetup = useCallback(async () => {
     if (!currentEvent) return;
 
@@ -69,6 +92,7 @@ export default function MateScreen() {
       return;
     }
 
+    setSavingStep(photoUri ? 'Identifying species...' : 'Saving setup data...');
     setScreenState('saving');
 
     try {
@@ -81,7 +105,7 @@ export default function MateScreen() {
         rodReel: rodReel.trim(),
       };
 
-      const updatedEvent: CatchEvent = {
+      let updatedEvent: CatchEvent = {
         ...currentEvent,
         setup: setupData,
         voiceNote: {
@@ -92,13 +116,43 @@ export default function MateScreen() {
         notes: notes.trim() || currentEvent.notes,
       };
 
+      if (photoUri) {
+        const savedPhotoPath = await saveEventPhoto(currentEvent.eventCode, photoUri);
+        let classification;
+        try {
+          classification = await Promise.race([
+            classifyCatch(savedPhotoPath),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('timeout')), 30000)
+            ),
+          ]);
+        } catch {
+          classification = {
+            species: 'Unknown',
+            confidence: 0,
+            sizeEstimate: 'Unknown',
+            notes: 'AI identification timed out — please identify manually.',
+            lengthCm: null,
+            girthCm: null,
+            weightLbsEstimate: null,
+          };
+        }
+        updatedEvent = {
+          ...updatedEvent,
+          photo: savedPhotoPath,
+          status: 'landed',
+          species: classification.species,
+          confidence: classification.confidence,
+          sizeEstimate: classification.sizeEstimate,
+          notes: classification.notes || updatedEvent.notes,
+          weightLbsEstimate: classification.weightLbsEstimate,
+        };
+      }
+
       await updateEvent(updatedEvent);
       await saveEventSnapshot(updatedEvent);
       setCurrentEvent(updatedEvent);
-
-      // Background sync
       syncAllPending().catch(console.error);
-
       setScreenState('confirmed');
     } catch (error) {
       console.error('[Mate] handleSaveSetup error:', error);
@@ -107,6 +161,7 @@ export default function MateScreen() {
     }
   }, [
     currentEvent,
+    photoUri,
     downriggerDepth,
     lureType,
     lureColor,
@@ -122,6 +177,7 @@ export default function MateScreen() {
   const handleReset = useCallback(() => {
     setCurrentEvent(null);
     setScreenState('home');
+    setPhotoUri('');
     setDownriggerDepth('');
     setLureType('');
     setLureColor('');
@@ -170,9 +226,9 @@ export default function MateScreen() {
           {yourRoleOpen && (
             <Text style={styles.infoText}>
               1. Get the event code from the captain{'\n'}
-              2. Tap "Join Event" and enter the code{'\n'}
-              3. Fill in downrigger depth, lure, speed{'\n'}
-              4. Add a voice note about conditions{'\n'}
+              2. Tap "Join Event" and select the event{'\n'}
+              3. Add a photo — AI identifies the species{'\n'}
+              4. Fill in downrigger depth, lure, speed{'\n'}
               5. Save — data syncs to captain's log
             </Text>
           )}
@@ -186,7 +242,7 @@ export default function MateScreen() {
     return (
       <View style={[styles.container, styles.centered]}>
         <ActivityIndicator color="#1e90ff" size="large" />
-        <Text style={styles.savingText}>Saving setup data...</Text>
+        <Text style={styles.savingText}>{savingStep}</Text>
       </View>
     );
   }
@@ -196,11 +252,19 @@ export default function MateScreen() {
     return (
       <View style={[styles.container, styles.centered]}>
         <Text style={styles.checkmark}>✓</Text>
-        <Text style={styles.confirmedTitle}>Setup Saved!</Text>
+        <Text style={styles.confirmedTitle}>
+          {currentEvent.species ? currentEvent.species : 'Setup Saved!'}
+        </Text>
+        {currentEvent.species ? (
+          <Text style={styles.confirmedConfidence}>
+            {Math.round(currentEvent.confidence * 100)}% confidence
+            {currentEvent.sizeEstimate && currentEvent.sizeEstimate !== 'Unknown'
+              ? ` · ${currentEvent.sizeEstimate}` : ''}
+          </Text>
+        ) : null}
         <Text style={styles.confirmedEventCode}>
           {currentEvent.eventCode}
         </Text>
-        <Text style={styles.confirmedSpecies}>{currentEvent.species}</Text>
         <Text style={styles.confirmedTime}>
           {formatTimestamp(currentEvent.timestamp)}
         </Text>
@@ -250,6 +314,25 @@ export default function MateScreen() {
             <Text style={styles.bannerTime}>
               {formatTimestamp(currentEvent.timestamp)}
             </Text>
+          </View>
+
+          {/* Fish Photo */}
+          <View style={styles.formCard}>
+            <Text style={styles.formTitle}>Fish Photo</Text>
+            {photoUri ? (
+              <View>
+                <Image source={{ uri: photoUri }} style={styles.photoPreview} resizeMode="cover" />
+                <TouchableOpacity style={styles.retakePhotoButton} onPress={handleTakePhoto}>
+                  <Text style={styles.retakePhotoText}>Retake Photo</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.addPhotoButton} onPress={handleTakePhoto} activeOpacity={0.8}>
+                <Text style={styles.addPhotoIcon}>📷</Text>
+                <Text style={styles.addPhotoText}>Add Photo</Text>
+                <Text style={styles.addPhotoSub}>AI will identify the species</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Weather summary */}
@@ -508,10 +591,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 4,
   },
-  confirmedSpecies: {
-    color: '#ffffff',
-    fontSize: 16,
-    marginBottom: 4,
+  confirmedConfidence: {
+    color: '#69f0ae',
+    fontSize: 14,
+    marginBottom: 8,
   },
   confirmedTime: {
     color: '#8899aa',
@@ -678,6 +761,46 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: '#8899aa',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  addPhotoButton: {
+    backgroundColor: '#0a1628',
+    borderWidth: 1,
+    borderColor: '#1a2d4a',
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
+  },
+  addPhotoIcon: {
+    fontSize: 36,
+    marginBottom: 6,
+  },
+  addPhotoText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  addPhotoSub: {
+    color: '#8899aa',
+    fontSize: 12,
+  },
+  photoPreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  retakePhotoButton: {
+    borderWidth: 1,
+    borderColor: '#8899aa',
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  retakePhotoText: {
+    color: '#8899aa',
+    fontSize: 14,
     fontWeight: '600',
   },
 });
