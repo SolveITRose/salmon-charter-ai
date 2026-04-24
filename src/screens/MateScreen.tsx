@@ -216,7 +216,7 @@ export default function MateScreen() {
               : ''}
           </Text>
           <Text style={styles.summaryItem}>
-            Speed: {currentEvent.setup.trollingSpeed} kts
+            Speed: {currentEvent.setup.trollingSpeed} mph
           </Text>
           <Text style={styles.summaryItem}>
             Line: {currentEvent.setup.lineWeight}
@@ -327,7 +327,7 @@ export default function MateScreen() {
 
             {/* Trolling Speed */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Trolling Speed (knots)</Text>
+              <Text style={styles.fieldLabel}>Trolling Speed (mph)</Text>
               <TextInput
                 style={styles.input}
                 value={trollingSpeed}

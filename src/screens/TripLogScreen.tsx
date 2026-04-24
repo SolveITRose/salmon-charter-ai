@@ -355,7 +355,7 @@ export default function TripLogScreen() {
                     />
                     <SetupRow
                       label="Speed"
-                      value={formatSpeed(selectedEvent.setup.trollingSpeed)}
+                      value={`${selectedEvent.setup.trollingSpeed.toFixed(1)} mph`}
                     />
                     {selectedEvent.setup.rodReel && (
                       <SetupRow

@@ -246,7 +246,7 @@ export async function generateTripInsight(
         (e, i) =>
           `Catch ${i + 1}: ${e.species} at ${e.time}, ` +
           `Depth: ${e.setup.downriggerDepth}ft, Lure: ${e.setup.lureType}, ` +
-          `Speed: ${e.setup.trollingSpeed}kts, HydroScore: ${e.hydroScore}/100`
+          `Speed: ${e.setup.trollingSpeed}mph, HydroScore: ${e.hydroScore}/100`
       )
       .join('\n');
 

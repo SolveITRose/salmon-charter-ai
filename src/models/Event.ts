@@ -23,7 +23,7 @@ export interface SetupData {
   lureType: string;
   lureColor: string;
   lineWeight: string;
-  trollingSpeed: number;    // knots
+  trollingSpeed: number;    // mph
   rodReel: string;
 }
 
