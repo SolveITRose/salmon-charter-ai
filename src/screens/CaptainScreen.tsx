@@ -9,7 +9,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import uuid from 'react-native-uuid';
 
-import { CatchEvent, GpsData, WeatherData, HydroScore } from '../models/Event';
+import { CatchEvent, GpsData, WeatherData } from '../models/Event';
 import { getCurrentPosition } from '../services/gpsService';
 import { fetchWeatherData, fetchWindHistory, fetchPressureHistory } from '../services/weatherService';
 import { computeHydroScore } from '../agents/hydrodynamicAgent';
@@ -81,6 +81,7 @@ export default function CaptainScreen() {
     waterTemp: 13,
     pressure: 1013,
     conditions: 'Unknown',
+    cloudCover: 0,
     fetchedAt: new Date().toISOString(),
   });
 
@@ -135,7 +136,7 @@ export default function CaptainScreen() {
         photo: '',
         gps: gpsData,
         weather: weatherData,
-        setup: { downriggerDepth: 0, lureType: '', lureColor: '', lineWeight: '', trollingSpeed: 0, rodReel: '' },
+        setup: { downriggerDepth: 0, lureType: '', lureColor: '', trollingSpeed: 0 },
         voiceNote: { audioPath: '', transcript: '', duration: 0 },
         hydroScore,
         species: '',

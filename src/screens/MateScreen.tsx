@@ -23,7 +23,10 @@ import VoiceInput from '../components/VoiceInput';
 import WeatherWidget from '../components/WeatherWidget';
 import { formatTimestamp } from '../utils/formatters';
 
-const LINE_WEIGHTS = ['8 lb', '10 lb', '12 lb', '15 lb', '20 lb', '30 lb'];
+const RIG_TYPES = ['Downrigger', 'Flatline'];
+const RIG_POSITIONS = ['Main', 'Slider'];
+const BOAT_SIDES = ['Port', 'Starboard'];
+const LINE_TYPES = ['Mono', 'Braid', 'Leadcore', 'Fluorocarbon'];
 
 type ScreenState = 'home' | 'setup' | 'saving' | 'confirmed';
 
@@ -34,12 +37,14 @@ export default function MateScreen() {
 
   // Form state
   const [downriggerDepth, setDownriggerDepth] = useState('');
+  const [backFromBall, setBackFromBall] = useState('');
   const [lureType, setLureType] = useState('');
   const [lureColor, setLureColor] = useState('');
-  const [lineWeight, setLineWeight] = useState('15 lb');
   const [trollingSpeed, setTrollingSpeed] = useState('');
-  const [rodReel, setRodReel] = useState('');
-  const [notes, setNotes] = useState('');
+  const [rigType, setRigType] = useState('');
+  const [rigPosition, setRigPosition] = useState('');
+  const [boatSide, setBoatSide] = useState('');
+  const [lineType, setLineType] = useState('');
   const [voiceAudioPath, setVoiceAudioPath] = useState('');
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const [voiceDuration, setVoiceDuration] = useState(0);
@@ -52,16 +57,15 @@ export default function MateScreen() {
     setShowJoinModal(false);
 
     // Pre-fill if event already has setup data
-    if (event.setup.downriggerDepth > 0) {
-      setDownriggerDepth(String(event.setup.downriggerDepth));
-    }
+    if (event.setup.downriggerDepth > 0) setDownriggerDepth(String(event.setup.downriggerDepth));
+    if (event.setup.backFromBall) setBackFromBall(String(event.setup.backFromBall));
     if (event.setup.lureType) setLureType(event.setup.lureType);
     if (event.setup.lureColor) setLureColor(event.setup.lureColor);
-    if (event.setup.lineWeight) setLineWeight(event.setup.lineWeight);
-    if (event.setup.trollingSpeed > 0) {
-      setTrollingSpeed(String(event.setup.trollingSpeed));
-    }
-    if (event.setup.rodReel) setRodReel(event.setup.rodReel);
+    if (event.setup.trollingSpeed > 0) setTrollingSpeed(String(event.setup.trollingSpeed));
+    if (event.setup.rigType) setRigType(event.setup.rigType);
+    if (event.setup.rigPosition) setRigPosition(event.setup.rigPosition);
+    if (event.setup.boatSide) setBoatSide(event.setup.boatSide);
+    if (event.setup.lineType) setLineType(event.setup.lineType);
 
     setScreenState('setup');
   }, []);
@@ -98,11 +102,14 @@ export default function MateScreen() {
     try {
       const setupData: SetupData = {
         downriggerDepth: parseFloat(downriggerDepth) || 0,
+        backFromBall: parseFloat(backFromBall) || undefined,
         lureType: lureType.trim(),
         lureColor: lureColor.trim(),
-        lineWeight,
         trollingSpeed: parseFloat(trollingSpeed) || 0,
-        rodReel: rodReel.trim(),
+        rigType: rigType || undefined,
+        rigPosition: rigPosition || undefined,
+        boatSide: boatSide || undefined,
+        lineType: lineType || undefined,
       };
 
       let updatedEvent: CatchEvent = {
@@ -113,7 +120,6 @@ export default function MateScreen() {
           transcript: voiceTranscript,
           duration: voiceDuration,
         },
-        notes: notes.trim() || currentEvent.notes,
       };
 
       if (photoUri) {
@@ -163,12 +169,14 @@ export default function MateScreen() {
     currentEvent,
     photoUri,
     downriggerDepth,
+    backFromBall,
     lureType,
     lureColor,
-    lineWeight,
     trollingSpeed,
-    rodReel,
-    notes,
+    rigType,
+    rigPosition,
+    boatSide,
+    lineType,
     voiceAudioPath,
     voiceTranscript,
     voiceDuration,
@@ -179,12 +187,14 @@ export default function MateScreen() {
     setScreenState('home');
     setPhotoUri('');
     setDownriggerDepth('');
+    setBackFromBall('');
     setLureType('');
     setLureColor('');
-    setLineWeight('15 lb');
     setTrollingSpeed('');
-    setRodReel('');
-    setNotes('');
+    setRigType('');
+    setRigPosition('');
+    setBoatSide('');
+    setLineType('');
     setVoiceAudioPath('');
     setVoiceTranscript('');
     setVoiceDuration(0);
@@ -228,7 +238,7 @@ export default function MateScreen() {
               1. Get the event code from the captain{'\n'}
               2. Tap "Join Event" and select the event{'\n'}
               3. Add a photo — AI identifies the species{'\n'}
-              4. Fill in downrigger depth, lure, speed{'\n'}
+              4. Fill in rig setup details{'\n'}
               5. Save — data syncs to captain's log
             </Text>
           )}
@@ -262,29 +272,31 @@ export default function MateScreen() {
               ? ` · ${currentEvent.sizeEstimate}` : ''}
           </Text>
         ) : null}
-        <Text style={styles.confirmedEventCode}>
-          {currentEvent.eventCode}
-        </Text>
-        <Text style={styles.confirmedTime}>
-          {formatTimestamp(currentEvent.timestamp)}
-        </Text>
+        <Text style={styles.confirmedEventCode}>{currentEvent.eventCode}</Text>
+        <Text style={styles.confirmedTime}>{formatTimestamp(currentEvent.timestamp)}</Text>
 
         <View style={styles.confirmedSummary}>
           <Text style={styles.summaryItem}>
             Depth: {currentEvent.setup.downriggerDepth} ft
+            {currentEvent.setup.backFromBall ? ` · ${currentEvent.setup.backFromBall} ft back` : ''}
           </Text>
           <Text style={styles.summaryItem}>
-            Lure: {currentEvent.setup.lureType}{' '}
-            {currentEvent.setup.lureColor
-              ? `(${currentEvent.setup.lureColor})`
-              : ''}
+            Lure: {currentEvent.setup.lureType}
+            {currentEvent.setup.lureColor ? ` (${currentEvent.setup.lureColor})` : ''}
           </Text>
-          <Text style={styles.summaryItem}>
-            Speed: {currentEvent.setup.trollingSpeed} mph
-          </Text>
-          <Text style={styles.summaryItem}>
-            Line: {currentEvent.setup.lineWeight}
-          </Text>
+          <Text style={styles.summaryItem}>Speed: {currentEvent.setup.trollingSpeed} mph</Text>
+          {currentEvent.setup.rigType ? (
+            <Text style={styles.summaryItem}>
+              Rig: {currentEvent.setup.rigType}
+              {currentEvent.setup.rigPosition ? ` · ${currentEvent.setup.rigPosition}` : ''}
+            </Text>
+          ) : null}
+          {currentEvent.setup.boatSide ? (
+            <Text style={styles.summaryItem}>Side: {currentEvent.setup.boatSide}</Text>
+          ) : null}
+          {currentEvent.setup.lineType ? (
+            <Text style={styles.summaryItem}>Line: {currentEvent.setup.lineType}</Text>
+          ) : null}
         </View>
 
         <TouchableOpacity style={styles.doneButton} onPress={handleReset}>
@@ -311,9 +323,7 @@ export default function MateScreen() {
           <View style={styles.eventBanner}>
             <Text style={styles.bannerCode}>{currentEvent.eventCode}</Text>
             <Text style={styles.bannerSpecies}>{currentEvent.species}</Text>
-            <Text style={styles.bannerTime}>
-              {formatTimestamp(currentEvent.timestamp)}
-            </Text>
+            <Text style={styles.bannerTime}>{formatTimestamp(currentEvent.timestamp)}</Text>
           </View>
 
           {/* Fish Photo */}
@@ -341,7 +351,7 @@ export default function MateScreen() {
             <WeatherWidget weather={currentEvent.weather} />
           </View>
 
-          {/* Setup Form */}
+          {/* Rig Setup */}
           <View style={styles.formCard}>
             <Text style={styles.formTitle}>Rig Setup</Text>
 
@@ -353,6 +363,19 @@ export default function MateScreen() {
                 value={downriggerDepth}
                 onChangeText={setDownriggerDepth}
                 placeholder="e.g. 45"
+                placeholderTextColor="#4a5f7a"
+                keyboardType="numeric"
+              />
+            </View>
+
+            {/* Back from Downrigger Ball */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Back from Downrigger Ball (feet)</Text>
+              <TextInput
+                style={styles.input}
+                value={backFromBall}
+                onChangeText={setBackFromBall}
+                placeholder="e.g. 10"
                 placeholderTextColor="#4a5f7a"
                 keyboardType="numeric"
               />
@@ -382,32 +405,6 @@ export default function MateScreen() {
               />
             </View>
 
-            {/* Line Weight */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Line Weight</Text>
-              <View style={styles.pickerWrapper}>
-                {LINE_WEIGHTS.map((weight) => (
-                  <TouchableOpacity
-                    key={weight}
-                    style={[
-                      styles.weightChip,
-                      lineWeight === weight && styles.weightChipSelected,
-                    ]}
-                    onPress={() => setLineWeight(weight)}
-                  >
-                    <Text
-                      style={[
-                        styles.weightChipText,
-                        lineWeight === weight && styles.weightChipTextSelected,
-                      ]}
-                    >
-                      {weight}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
             {/* Trolling Speed */}
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>Trolling Speed (mph)</Text>
@@ -421,16 +418,76 @@ export default function MateScreen() {
               />
             </View>
 
-            {/* Rod/Reel */}
+            {/* Downrigger or Flatline */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Rod / Reel</Text>
-              <TextInput
-                style={styles.input}
-                value={rodReel}
-                onChangeText={setRodReel}
-                placeholder="e.g. Shimano Tekota 600, 8.5ft rod"
-                placeholderTextColor="#4a5f7a"
-              />
+              <Text style={styles.fieldLabel}>Downrigger or Flatline</Text>
+              <View style={styles.chipRow}>
+                {RIG_TYPES.map((opt) => (
+                  <TouchableOpacity
+                    key={opt}
+                    style={[styles.chip, rigType === opt && styles.chipSelected]}
+                    onPress={() => setRigType(rigType === opt ? '' : opt)}
+                  >
+                    <Text style={[styles.chipText, rigType === opt && styles.chipTextSelected]}>
+                      {opt}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Main or Slider */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Main or Slider</Text>
+              <View style={styles.chipRow}>
+                {RIG_POSITIONS.map((opt) => (
+                  <TouchableOpacity
+                    key={opt}
+                    style={[styles.chip, rigPosition === opt && styles.chipSelected]}
+                    onPress={() => setRigPosition(rigPosition === opt ? '' : opt)}
+                  >
+                    <Text style={[styles.chipText, rigPosition === opt && styles.chipTextSelected]}>
+                      {opt}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Side of Boat Landed */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Side of Boat Landed</Text>
+              <View style={styles.chipRow}>
+                {BOAT_SIDES.map((opt) => (
+                  <TouchableOpacity
+                    key={opt}
+                    style={[styles.chip, boatSide === opt && styles.chipSelected]}
+                    onPress={() => setBoatSide(boatSide === opt ? '' : opt)}
+                  >
+                    <Text style={[styles.chipText, boatSide === opt && styles.chipTextSelected]}>
+                      {opt}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Line Type */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Line Type</Text>
+              <View style={styles.chipRow}>
+                {LINE_TYPES.map((opt) => (
+                  <TouchableOpacity
+                    key={opt}
+                    style={[styles.chip, lineType === opt && styles.chipSelected]}
+                    onPress={() => setLineType(lineType === opt ? '' : opt)}
+                  >
+                    <Text style={[styles.chipText, lineType === opt && styles.chipTextSelected]}>
+                      {opt}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           </View>
 
@@ -445,34 +502,12 @@ export default function MateScreen() {
             />
           </View>
 
-          {/* Additional Notes */}
-          <View style={styles.formCard}>
-            <Text style={styles.fieldLabel}>Additional Notes</Text>
-            <TextInput
-              style={[styles.input, styles.notesInput]}
-              value={notes}
-              onChangeText={setNotes}
-              placeholder="Any other observations about the bite, conditions, or setup..."
-              placeholderTextColor="#4a5f7a"
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-            />
-          </View>
-
           {/* Save Button */}
-          <TouchableOpacity
-            style={styles.saveButton}
-            onPress={handleSaveSetup}
-            activeOpacity={0.8}
-          >
+          <TouchableOpacity style={styles.saveButton} onPress={handleSaveSetup} activeOpacity={0.8}>
             <Text style={styles.saveButtonText}>Save Setup</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={handleReset}
-          >
+          <TouchableOpacity style={styles.cancelButton} onPress={handleReset}>
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
         </ScrollView>
@@ -506,12 +541,6 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 8,
-  },
-  heroSubtitle: {
-    color: '#8899aa',
-    fontSize: 16,
-    textAlign: 'center',
-    paddingHorizontal: 32,
   },
   joinButton: {
     backgroundColor: '#00c853',
@@ -704,16 +733,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     padding: 12,
   },
-  notesInput: {
-    minHeight: 80,
-    marginTop: 6,
-  },
-  pickerWrapper: {
+  chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  weightChip: {
+  chip: {
     borderWidth: 1,
     borderColor: '#1a2d4a',
     borderRadius: 8,
@@ -721,16 +746,16 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     backgroundColor: '#0a1628',
   },
-  weightChipSelected: {
+  chipSelected: {
     borderColor: '#1e90ff',
     backgroundColor: '#1e90ff22',
   },
-  weightChipText: {
+  chipText: {
     color: '#8899aa',
     fontSize: 14,
     fontWeight: '500',
   },
-  weightChipTextSelected: {
+  chipTextSelected: {
     color: '#1e90ff',
     fontWeight: '700',
   },

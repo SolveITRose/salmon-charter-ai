@@ -19,12 +19,15 @@ export interface WeatherData {
 }
 
 export interface SetupData {
-  downriggerDepth: number;  // feet
+  downriggerDepth: number;   // feet
+  backFromBall?: number;     // feet back from downrigger ball
   lureType: string;
   lureColor: string;
-  lineWeight: string;
-  trollingSpeed: number;    // mph
-  rodReel: string;
+  trollingSpeed: number;     // mph
+  rigType?: string;          // 'Downrigger' | 'Flatline'
+  rigPosition?: string;      // 'Main' | 'Slider'
+  boatSide?: string;         // 'Port' | 'Starboard'
+  lineType?: string;         // 'Mono' | 'Braid' | 'Leadcore' | 'Fluorocarbon'
 }
 
 export interface VoiceNote {

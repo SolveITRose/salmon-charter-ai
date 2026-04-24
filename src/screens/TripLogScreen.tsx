@@ -350,18 +350,20 @@ export default function TripLogScreen() {
                       value={`${selectedEvent.setup.lureType} ${selectedEvent.setup.lureColor || ''}`.trim()}
                     />
                     <SetupRow
-                      label="Line"
-                      value={selectedEvent.setup.lineWeight}
-                    />
-                    <SetupRow
                       label="Speed"
                       value={`${selectedEvent.setup.trollingSpeed.toFixed(1)} mph`}
                     />
-                    {selectedEvent.setup.rodReel && (
+                    {selectedEvent.setup.rigType && (
                       <SetupRow
-                        label="Rod/Reel"
-                        value={selectedEvent.setup.rodReel}
+                        label="Rig"
+                        value={[selectedEvent.setup.rigType, selectedEvent.setup.rigPosition].filter(Boolean).join(' · ')}
                       />
+                    )}
+                    {selectedEvent.setup.boatSide && (
+                      <SetupRow label="Side" value={selectedEvent.setup.boatSide} />
+                    )}
+                    {selectedEvent.setup.lineType && (
+                      <SetupRow label="Line" value={selectedEvent.setup.lineType} />
                     )}
                   </View>
                 </View>
