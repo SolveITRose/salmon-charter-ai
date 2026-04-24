@@ -13,6 +13,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 
 const Audio = Platform.OS !== 'web' ? require('expo-av').Audio : null;
 
@@ -53,9 +54,11 @@ export default function TripLogScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    loadEvents();
-  }, [loadEvents]);
+  useFocusEffect(
+    useCallback(() => {
+      loadEvents();
+    }, [loadEvents])
+  );
 
   useEffect(() => {
     return () => {
@@ -374,6 +377,33 @@ export default function TripLogScreen() {
                 <Text style={styles.detailSectionTitle}>HydroScore</Text>
                 <HydroScoreCard hydroScore={selectedEvent.hydroScore} />
               </View>
+
+              {/* Fish Finder */}
+              {selectedEvent.fishFinder && (
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionTitle}>Fish Finder</Text>
+                  <View style={styles.setupGrid}>
+                    {selectedEvent.fishFinder.depth !== undefined && (
+                      <SetupRow label="Depth" value={`${Math.round(selectedEvent.fishFinder.depth)} ft`} />
+                    )}
+                    {selectedEvent.fishFinder.waterTemp !== undefined && (
+                      <SetupRow label="Water Temp" value={`${selectedEvent.fishFinder.waterTemp.toFixed(1)} °C`} />
+                    )}
+                    {selectedEvent.fishFinder.speedOverGround !== undefined && (
+                      <SetupRow label="SOG" value={`${selectedEvent.fishFinder.speedOverGround.toFixed(1)} mph`} />
+                    )}
+                    {selectedEvent.fishFinder.courseOverGround !== undefined && (
+                      <SetupRow label="COG" value={`${Math.round(selectedEvent.fishFinder.courseOverGround)}°`} />
+                    )}
+                    {selectedEvent.fishFinder.heading !== undefined && (
+                      <SetupRow label="Heading" value={`${Math.round(selectedEvent.fishFinder.heading)}°`} />
+                    )}
+                    {selectedEvent.fishFinder.baitOnScreen !== undefined && (
+                      <SetupRow label="Bait on Screen" value={selectedEvent.fishFinder.baitOnScreen ? 'Yes' : 'No'} />
+                    )}
+                  </View>
+                </View>
+              )}
 
               {/* Voice Note */}
               {selectedEvent.voiceNote.audioPath ? (
