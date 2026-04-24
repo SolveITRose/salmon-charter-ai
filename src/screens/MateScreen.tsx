@@ -97,11 +97,6 @@ export default function MateScreen() {
   const handleSaveSetup = useCallback(async () => {
     if (!currentEvent) return;
 
-    if (!lureType.trim()) {
-      setErrorMessage('Lure type is required.');
-      return;
-    }
-
     setSavingStep(photoUri ? 'Identifying species...' : 'Saving setup data...');
     setScreenState('saving');
 

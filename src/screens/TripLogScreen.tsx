@@ -324,7 +324,7 @@ export default function TripLogScreen() {
                     {formatGPS(selectedEvent.gps.lat, selectedEvent.gps.lng)}
                   </Text>
                   <Text style={styles.detailMeta}>
-                    Heading: {selectedEvent.gps.heading.toFixed(0)}°  |  Speed:{' '}
+                    Heading: {Math.round(selectedEvent.gps.heading)}°  |  Speed:{' '}
                     {formatSpeed(selectedEvent.gps.speed)}
                   </Text>
                 </View>
@@ -351,7 +351,7 @@ export default function TripLogScreen() {
                     />
                     <SetupRow
                       label="Speed"
-                      value={`${selectedEvent.setup.trollingSpeed.toFixed(1)} mph`}
+                      value={`${Math.round(selectedEvent.setup.trollingSpeed)} mph`}
                     />
                     {selectedEvent.setup.rigType && (
                       <SetupRow

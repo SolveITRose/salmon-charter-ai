@@ -163,7 +163,7 @@ export async function saveEventAudio(
  */
 export async function getStorageUsed(): Promise<number> {
   try {
-    const info = await FileSystem.getInfoAsync(EVENTS_BASE, { size: true });
+    const info = await FileSystem.getInfoAsync(EVENTS_BASE, { size: true } as any);
     if (info.exists && 'size' in info) {
       return info.size ?? 0;
     }

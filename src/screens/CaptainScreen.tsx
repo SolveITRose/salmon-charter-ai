@@ -14,11 +14,11 @@ import { getCurrentPosition } from '../services/gpsService';
 import { fetchWeatherData, fetchWindHistory, fetchPressureHistory } from '../services/weatherService';
 import { computeHydroScore } from '../agents/hydrodynamicAgent';
 import { insertEvent, updateEvent } from '../storage/localDB';
-import { formatEventCode, formatTimestamp } from '../utils/formatters';
+import { formatEventCode } from '../utils/formatters';
 import WeatherWaterCard from '../components/WeatherWaterCard';
 import FishFinderModal from '../components/FishFinderModal';
 import { fetchTripConditions, fetchPreyData, TripConditions } from '../services/weatherWaterService';
-import { saveTripConditions, getPendingBiteEvents } from '../storage/localDB';
+import { saveTripConditions } from '../storage/localDB';
 
 const COUNTER_KEY = 'event_counter';
 
@@ -26,15 +26,12 @@ export default function CaptainScreen() {
   const [tripConditions, setTripConditions] = useState<TripConditions | null>(null);
   const [tripConditionsLoading, setTripConditionsLoading] = useState(false);
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
-  const [pendingBites, setPendingBites] = useState<CatchEvent[]>([]);
   const [fishOnLoading, setFishOnLoading] = useState(false);
   const [fishOnMessage, setFishOnMessage] = useState<string | null>(null);
-  const [showBiteList, setShowBiteList] = useState(false);
   const [fishFinderEvent, setFishFinderEvent] = useState<CatchEvent | null>(null);
 
   useEffect(() => {
     loadTripConditions();
-    loadPendingBites();
   }, []);
 
   useEffect(() => {
@@ -86,11 +83,6 @@ export default function CaptainScreen() {
     cloudCover: 0,
     fetchedAt: new Date().toISOString(),
   });
-
-  const loadPendingBites = useCallback(async () => {
-    const bites = await getPendingBiteEvents();
-    setPendingBites(bites);
-  }, []);
 
   const handleFishOn = useCallback(async () => {
     setFishOnLoading(true);
@@ -150,8 +142,6 @@ export default function CaptainScreen() {
       };
 
       await insertEvent(event);
-      await loadPendingBites();
-      setShowBiteList(true);
       setFishFinderEvent(event);
     } catch (error) {
       console.error('[Captain] handleFishOn error:', error);
@@ -159,7 +149,7 @@ export default function CaptainScreen() {
     } finally {
       setFishOnLoading(false);
     }
-  }, [loadPendingBites]);
+  }, []);
 
   const handleFishFinderSave = useCallback(async (data: FishFinderData) => {
     if (!fishFinderEvent) return;
@@ -217,29 +207,6 @@ export default function CaptainScreen() {
         <TouchableOpacity style={styles.fishOnBanner} onPress={() => setFishOnMessage(null)} activeOpacity={0.8}>
           <Text style={styles.fishOnBannerText}>🎣 {fishOnMessage}</Text>
         </TouchableOpacity>
-      )}
-
-      {pendingBites.length > 0 && (
-        <>
-          <TouchableOpacity
-            style={styles.pendingBitesBar}
-            onPress={() => setShowBiteList(v => !v)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.pendingBitesText}>
-              🐟 {pendingBites.length} fish pending photo {showBiteList ? '▲' : '▼'}
-            </Text>
-          </TouchableOpacity>
-          {showBiteList && (
-            <View style={styles.biteList}>
-              {pendingBites.map((b, i) => (
-                <Text key={b.id} style={styles.biteListItem}>
-                  {i + 1}. {b.eventCode} — hooked {formatTimestamp(b.biteTimestamp || b.timestamp)}
-                </Text>
-              ))}
-            </View>
-          )}
-        </>
       )}
 
       <TouchableOpacity style={styles.infoBox} onPress={() => setHowItWorksOpen((v) => !v)} activeOpacity={0.7}>
