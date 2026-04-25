@@ -198,7 +198,7 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
           label="Pressure"
           value={
             conditions.barometric_pressure_hpa !== null
-              ? `${conditions.barometric_pressure_hpa} hPa${trendArrow(conditions.pressure_trend)}`
+              ? `${Math.round(conditions.barometric_pressure_hpa)} hPa${trendArrow(conditions.pressure_trend)}`
               : '—'
           }
         />
@@ -206,13 +206,13 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
           label="Wind"
           value={
             conditions.wind_speed_mph !== null
-              ? `${conditions.wind_speed_mph} mph ${conditions.wind_direction_label ?? ''}`
+              ? `${Math.round(conditions.wind_speed_mph)} mph ${conditions.wind_direction_label ?? ''}`
               : '—'
           }
         />
         <Row
           label="Gusts"
-          value={conditions.wind_gust_mph !== null ? `${conditions.wind_gust_mph} mph` : '—'}
+          value={conditions.wind_gust_mph !== null ? `${Math.round(conditions.wind_gust_mph)} mph` : '—'}
         />
         <Row
           label="Conditions"
@@ -240,17 +240,17 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
         />
         <Row
           label="Precipitation"
-          value={conditions.precipitation_mm !== null ? `${conditions.precipitation_mm} mm` : '—'}
+          value={conditions.precipitation_mm !== null ? `${Math.round(conditions.precipitation_mm)} mm` : '—'}
         />
         <Row
           label="Visibility"
-          value={conditions.visibility_km !== null ? `${conditions.visibility_km} km` : '—'}
+          value={conditions.visibility_km !== null ? `${Math.round(conditions.visibility_km)} km` : '—'}
         />
         <Row
           label="UV Index"
           value={(() => {
             const uv = attenuatedUV(conditions.uv_index, conditions.cloud_cover_pct);
-            return uv !== null ? `${uv} · ${uvLabel(uv)}` : '—';
+            return uv !== null ? `${Math.round(uv)} · ${uvLabel(Math.round(uv))}` : '—';
           })()}
         />
       </Section>
@@ -268,10 +268,10 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
           {[...conditions.previous_wind].reverse().map((w, i) => (
             <View key={i} style={styles.windHistoryRow}>
               <Text style={[styles.windHistoryCol, styles.windHistoryColTime, styles.windHistoryVal]}>{w.time}</Text>
-              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.speed_mph} {w.direction_label}</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{Math.round(w.speed_mph)} {w.direction_label}</Text>
               <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.temp_c != null ? cToF(w.temp_c) : '—'}</Text>
               <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.cloud_cover_pct != null ? `${w.cloud_cover_pct}%` : '—'}</Text>
-              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.precipitation_mm != null && w.precipitation_mm > 0 ? `${w.precipitation_mm}mm` : '—'}</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.precipitation_mm != null && w.precipitation_mm > 0 ? `${Math.round(w.precipitation_mm)}mm` : '—'}</Text>
             </View>
           ))}
         </Section>
@@ -289,13 +289,13 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
         />
         <Row
           label="Wave Height"
-          value={conditions.wave_height_ft !== null ? `${conditions.wave_height_ft} ft` : '—'}
+          value={conditions.wave_height_ft !== null ? `${Math.round(conditions.wave_height_ft)} ft` : '—'}
         />
         <Row
           label="Wave Period"
           value={
             conditions.wave_period_dominant_s !== null
-              ? `${conditions.wave_period_dominant_s} s`
+              ? `${Math.round(conditions.wave_period_dominant_s)} s`
               : '—'
           }
         />
@@ -309,7 +309,7 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
         />
         <Row
           label="Current Speed"
-          value={conditions.current_speed_knots !== null ? `${conditions.current_speed_knots} kn` : '—'}
+          value={conditions.current_speed_knots !== null ? `${Math.round(conditions.current_speed_knots)} kn` : '—'}
         />
         <Row
           label="Current Direction"

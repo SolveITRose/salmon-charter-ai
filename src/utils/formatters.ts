@@ -94,8 +94,7 @@ export function formatSpeed(knots: number): string {
  * Output: "45 ft (13.7 m)"
  */
 export function formatDepth(feet: number): string {
-  const meters = feetToMeters(feet);
-  return `${Math.round(feet)} ft (${meters.toFixed(1)} m)`;
+  return `${Math.round(feet)} ft`;
 }
 
 /**
