@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { WeatherData } from '../models/Event';
-import { formatWindDirection } from '../utils/formatters';
+import { formatWindDirection, celsiusToFahrenheit } from '../utils/formatters';
 
 interface WeatherWidgetProps {
   weather: WeatherData | null;
@@ -55,7 +55,7 @@ const WeatherWidget = memo(function WeatherWidget({
       {/* Air Temp */}
       <View style={styles.item}>
         <Text style={styles.itemLabel}>Air</Text>
-        <Text style={styles.itemValue}>{weather.airTemp.toFixed(1)}°C</Text>
+        <Text style={styles.itemValue}>{Math.round(celsiusToFahrenheit(weather.airTemp))}°F</Text>
       </View>
 
       <View style={styles.divider} />
@@ -63,7 +63,7 @@ const WeatherWidget = memo(function WeatherWidget({
       {/* Water Temp */}
       <View style={styles.item}>
         <Text style={styles.itemLabel}>Water</Text>
-        <Text style={styles.itemValue}>{weather.waterTemp.toFixed(1)}°C</Text>
+        <Text style={styles.itemValue}>{Math.round(celsiusToFahrenheit(weather.waterTemp))}°F</Text>
       </View>
 
       <View style={styles.divider} />

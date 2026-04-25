@@ -30,6 +30,7 @@ import {
   formatSpeed,
   formatDepth,
   formatDuration,
+  celsiusToFahrenheit,
 } from '../utils/formatters';
 
 type FeedItem = { type: 'catch'; data: CatchEvent } | { type: 'mark'; data: GpsMark };
@@ -397,7 +398,7 @@ export default function TripLogScreen() {
                       <SetupRow label="Depth" value={`${Math.round(selectedEvent.fishFinder.depth)} ft`} />
                     )}
                     {selectedEvent.fishFinder.waterTemp !== undefined && (
-                      <SetupRow label="Water Temp" value={`${selectedEvent.fishFinder.waterTemp.toFixed(1)} °C`} />
+                      <SetupRow label="Water Temp" value={`${Math.round(celsiusToFahrenheit(selectedEvent.fishFinder.waterTemp))}°F`} />
                     )}
                     {selectedEvent.fishFinder.speedOverGround !== undefined && (
                       <SetupRow label="SOG" value={`${selectedEvent.fishFinder.speedOverGround.toFixed(1)} mph`} />

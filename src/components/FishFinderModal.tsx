@@ -13,6 +13,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { FishFinderData, GpsData, WeatherData } from '../models/Event';
 import { parseFishFinderScreen } from '../agents/fishFinderParser';
+import { celsiusToFahrenheit, fahrenheitToCelsius } from '../utils/formatters';
 
 interface FishFinderModalProps {
   visible: boolean;
@@ -32,9 +33,9 @@ export default function FishFinderModal({ visible, event, onSave, onSkip }: Fish
   const [scanError, setScanError] = useState<string | null>(null);
   const [capturedUri, setCapturedUri] = useState<string | null>(null);
 
-  // Review form state — pre-filled from event, overridden by scan results
+  // Review form state — displayed in °F, stored back as °C on save
   const [waterTemp, setWaterTemp] = useState(
-    event.weather.waterTemp ? String(Math.round(event.weather.waterTemp * 10) / 10) : ''
+    event.weather.waterTemp ? String(Math.round(celsiusToFahrenheit(event.weather.waterTemp))) : ''
   );
   const [depth, setDepth] = useState('');
   const [speedOverGround, setSpeedOverGround] = useState(
@@ -47,7 +48,7 @@ export default function FishFinderModal({ visible, event, onSave, onSkip }: Fish
   const [baitOnScreen, setBaitOnScreen] = useState<boolean | null>(null);
 
   const applyParsed = (parsed: Partial<FishFinderData>) => {
-    if (parsed.waterTemp !== undefined) setWaterTemp(String(parsed.waterTemp));
+    if (parsed.waterTemp !== undefined) setWaterTemp(String(Math.round(celsiusToFahrenheit(parsed.waterTemp))));
     if (parsed.depth !== undefined) setDepth(String(parsed.depth));
     if (parsed.speedOverGround !== undefined) setSpeedOverGround(String(parsed.speedOverGround));
     if (parsed.courseOverGround !== undefined) setCourseOverGround(String(parsed.courseOverGround));
@@ -106,8 +107,9 @@ export default function FishFinderModal({ visible, event, onSave, onSkip }: Fish
   };
 
   const handleSave = () => {
+    const waterTempF = parseFloat(waterTemp);
     const data: FishFinderData = {
-      waterTemp: parseFloat(waterTemp) || undefined,
+      waterTemp: waterTempF ? Math.round(fahrenheitToCelsius(waterTempF) * 10) / 10 : undefined,
       depth: parseFloat(depth) || undefined,
       speedOverGround: parseFloat(speedOverGround) || undefined,
       courseOverGround: parseFloat(courseOverGround) || undefined,
@@ -176,7 +178,7 @@ export default function FishFinderModal({ visible, event, onSave, onSkip }: Fish
 
                 <View style={styles.row}>
                   <View style={styles.halfField}>
-                    <Text style={styles.label}>Water Temp (°C)</Text>
+                    <Text style={styles.label}>Water Temp (°F)</Text>
                     <TextInput style={styles.input} value={waterTemp} onChangeText={setWaterTemp}
                       placeholder="e.g. 14.5" placeholderTextColor="#4a5f7a" keyboardType="decimal-pad" />
                   </View>

@@ -8,6 +8,12 @@ import {
   Linking,
 } from 'react-native';
 import { TripConditions } from '../services/weatherWaterService';
+import { celsiusToFahrenheit } from '../utils/formatters';
+
+function cToF(c: number | null): string {
+  if (c === null) return '—';
+  return `${Math.round(celsiusToFahrenheit(c))}°F`;
+}
 
 interface Props {
   conditions: TripConditions | null;
@@ -214,11 +220,11 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
         />
         <Row
           label="Air Temp"
-          value={conditions.air_temp_c !== null ? `${conditions.air_temp_c}°C` : '—'}
+          value={cToF(conditions.air_temp_c)}
         />
         <Row
           label="Feels Like"
-          value={conditions.feels_like_c !== null ? `${conditions.feels_like_c}°C` : '—'}
+          value={cToF(conditions.feels_like_c)}
         />
         <Row
           label="Humidity"
@@ -226,7 +232,7 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
         />
         <Row
           label="Dew Point"
-          value={conditions.dew_point_c !== null ? `${conditions.dew_point_c}°C` : '—'}
+          value={cToF(conditions.dew_point_c)}
         />
         <Row
           label="Cloud Cover"
@@ -263,7 +269,7 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
             <View key={i} style={styles.windHistoryRow}>
               <Text style={[styles.windHistoryCol, styles.windHistoryColTime, styles.windHistoryVal]}>{w.time}</Text>
               <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.speed_mph} {w.direction_label}</Text>
-              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.temp_c != null ? `${w.temp_c}°` : '—'}</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.temp_c != null ? cToF(w.temp_c) : '—'}</Text>
               <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.cloud_cover_pct != null ? `${w.cloud_cover_pct}%` : '—'}</Text>
               <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.precipitation_mm != null && w.precipitation_mm > 0 ? `${w.precipitation_mm}mm` : '—'}</Text>
             </View>
@@ -275,11 +281,11 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
       <Section title="Water">
         <Row
           label="SST (Buoy)"
-          value={conditions.sst_buoy_c !== null ? `${conditions.sst_buoy_c}°C` : '—'}
+          value={cToF(conditions.sst_buoy_c)}
         />
         <Row
           label="SST (Satellite)"
-          value={conditions.sst_satellite_c !== null ? `${conditions.sst_satellite_c}°C` : '—'}
+          value={cToF(conditions.sst_satellite_c)}
         />
         <Row
           label="Wave Height"

@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { GpsMark, MarkType } from '../models/Event';
-import { formatRelativeTime } from '../utils/formatters';
+import { formatRelativeTime, celsiusToFahrenheit } from '../utils/formatters';
 import { getScoreColor } from '../utils/scoring';
 
 interface MarkCardProps {
@@ -36,12 +36,12 @@ const MarkCard = memo(function MarkCard({ mark, onPress }: MarkCardProps) {
         <Text style={styles.time}>{formatRelativeTime(mark.timestamp)}</Text>
         {mark.notes ? <Text style={styles.notes} numberOfLines={1}>{mark.notes}</Text> : null}
         <Text style={styles.conditions}>
-          {mark.weather.conditions} · {Math.round(mark.weather.airTemp)}°C
+          {mark.weather.conditions} · {Math.round(celsiusToFahrenheit(mark.weather.airTemp))}°F
         </Text>
         {mark.fishFinder && (
           <Text style={styles.fishFinder}>
             🖥{mark.fishFinder.depth != null ? ` ${mark.fishFinder.depth}ft` : ''}
-            {mark.fishFinder.waterTemp != null ? ` · ${mark.fishFinder.waterTemp}°C` : ''}
+            {mark.fishFinder.waterTemp != null ? ` · ${Math.round(celsiusToFahrenheit(mark.fishFinder.waterTemp))}°F` : ''}
             {mark.fishFinder.speedOverGround != null ? ` · ${mark.fishFinder.speedOverGround}mph` : ''}
             {mark.fishFinder.baitOnScreen === true ? ' · bait ✓' : ''}
           </Text>
