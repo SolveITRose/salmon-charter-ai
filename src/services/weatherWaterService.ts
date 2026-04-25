@@ -51,7 +51,7 @@ export interface TripConditions {
   conditions_text: string | null;
   uv_index: number | null;
   uv_index_label: string | null;
-  previous_wind: Array<{ time: string; speed_mph: number; direction_deg: number; direction_label: string; temp_c: number | null; cloud_cover_pct: number | null }> | null;
+  previous_wind: Array<{ time: string; speed_mph: number; direction_deg: number; direction_label: string; temp_c: number | null; cloud_cover_pct: number | null; precipitation_mm: number | null }> | null;
   marine_warning_active: boolean;
   marine_warning_text: string | null;
   atmospheric_source: 'ndbc' | 'owm';
@@ -300,7 +300,7 @@ async function fetchPreviousWind(
     const url =
       `https://api.open-meteo.com/v1/forecast` +
       `?latitude=${lat}&longitude=${lng}` +
-      `&hourly=wind_speed_10m,wind_direction_10m,temperature_2m,cloud_cover` +
+      `&hourly=wind_speed_10m,wind_direction_10m,temperature_2m,cloud_cover,precipitation` +
       `&wind_speed_unit=mph` +
       `&start_date=${startDate}&end_date=${endDate}`;
     const res = await fetchWithTimeout(url, {}, 10000);
@@ -311,19 +311,21 @@ async function fetchPreviousWind(
     const dirs: number[] = data.hourly?.wind_direction_10m ?? [];
     const temps: number[] = data.hourly?.temperature_2m ?? [];
     const clouds: number[] = data.hourly?.cloud_cover ?? [];
+    const precips: number[] = data.hourly?.precipitation ?? [];
 
     const nowHour = now.getTime();
     return times
-      .map((t, i) => ({ t, speed: speeds[i], dir: dirs[i], temp: temps[i], cloud: clouds[i] }))
+      .map((t, i) => ({ t, speed: speeds[i], dir: dirs[i], temp: temps[i], cloud: clouds[i], precip: precips[i] }))
       .filter(({ t }) => new Date(t).getTime() <= nowHour)
       .slice(-24)
-      .map(({ t, speed, dir, temp, cloud }) => ({
+      .map(({ t, speed, dir, temp, cloud, precip }) => ({
         time: new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', hour12: true }),
         speed_mph: r1(speed) ?? 0,
         direction_deg: Math.round(dir ?? 0),
         direction_label: degreesToCardinal(dir ?? 0),
         temp_c: temp != null ? r1(temp) : null,
         cloud_cover_pct: cloud != null ? Math.round(cloud) : null,
+        precipitation_mm: precip != null ? r1(precip) : null,
       }));
   } catch {
     return null;

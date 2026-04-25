@@ -257,6 +257,7 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
             <Text style={styles.windHistoryCol}>Wind</Text>
             <Text style={styles.windHistoryCol}>Temp</Text>
             <Text style={styles.windHistoryCol}>Cloud</Text>
+            <Text style={styles.windHistoryCol}>Rain</Text>
           </View>
           {[...conditions.previous_wind].reverse().map((w, i) => (
             <View key={i} style={styles.windHistoryRow}>
@@ -264,6 +265,7 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
               <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.speed_mph} {w.direction_label}</Text>
               <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.temp_c != null ? `${w.temp_c}°` : '—'}</Text>
               <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.cloud_cover_pct != null ? `${w.cloud_cover_pct}%` : '—'}</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.precipitation_mm != null && w.precipitation_mm > 0 ? `${w.precipitation_mm}mm` : '—'}</Text>
             </View>
           ))}
         </Section>
