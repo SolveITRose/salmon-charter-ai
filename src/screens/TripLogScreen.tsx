@@ -401,7 +401,7 @@ export default function TripLogScreen() {
                       <SetupRow label="Water Temp" value={`${Math.round(celsiusToFahrenheit(selectedEvent.fishFinder.waterTemp))}°F`} />
                     )}
                     {selectedEvent.fishFinder.speedOverGround !== undefined && (
-                      <SetupRow label="SOG" value={`${selectedEvent.fishFinder.speedOverGround.toFixed(1)} mph`} />
+                      <SetupRow label="SOG" value={`${Math.round(selectedEvent.fishFinder.speedOverGround)} mph`} />
                     )}
                     {selectedEvent.fishFinder.courseOverGround !== undefined && (
                       <SetupRow label="COG" value={`${Math.round(selectedEvent.fishFinder.courseOverGround)}°`} />

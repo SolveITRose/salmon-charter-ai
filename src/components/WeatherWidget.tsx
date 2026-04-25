@@ -47,7 +47,7 @@ const WeatherWidget = memo(function WeatherWidget({
       {/* Waves */}
       <View style={styles.item}>
         <Text style={styles.itemLabel}>Waves</Text>
-        <Text style={styles.itemValue}>{weather.waveHeight.toFixed(1)} m</Text>
+        <Text style={styles.itemValue}>{Math.round(weather.waveHeight * 3.281)} ft</Text>
       </View>
 
       <View style={styles.divider} />
