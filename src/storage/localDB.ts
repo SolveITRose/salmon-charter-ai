@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { CatchEvent } from '../models/Event';
+import { CatchEvent, GpsMark } from '../models/Event';
 import { TripConditions } from '../services/weatherWaterService';
 
 const DB_NAME = 'salmon_charter.db';
@@ -34,6 +34,18 @@ export async function initDB(): Promise<SQLite.SQLiteDatabase> {
 
       CREATE INDEX IF NOT EXISTS idx_catch_events_synced
         ON catch_events (synced);
+
+      CREATE TABLE IF NOT EXISTS gps_marks (
+        id TEXT PRIMARY KEY NOT NULL,
+        mark_type TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        data TEXT NOT NULL,
+        synced INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_gps_marks_timestamp
+        ON gps_marks (timestamp DESC);
 
       CREATE TABLE IF NOT EXISTS trip_conditions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -256,6 +268,29 @@ export async function getEventCount(): Promise<number> {
     'SELECT COUNT(*) as count FROM catch_events'
   );
   return row?.count ?? 0;
+}
+
+// ─── GPS Marks ───────────────────────────────────────────────────────────────
+
+export async function insertMark(mark: GpsMark): Promise<void> {
+  const database = await getDB();
+  await database.runAsync(
+    `INSERT OR REPLACE INTO gps_marks (id, mark_type, timestamp, data, synced)
+     VALUES (?, ?, ?, ?, ?)`,
+    [mark.id, mark.markType, mark.timestamp, JSON.stringify(mark), mark.synced ? 1 : 0]
+  );
+}
+
+export async function getAllMarks(): Promise<GpsMark[]> {
+  const database = await getDB();
+  const rows = await database.getAllAsync<{ data: string }>(
+    'SELECT data FROM gps_marks ORDER BY timestamp DESC'
+  );
+  return rows
+    .map((r) => {
+      try { return JSON.parse(r.data) as GpsMark; } catch { return null; }
+    })
+    .filter((m): m is GpsMark => m !== null);
 }
 
 /**

@@ -2,18 +2,20 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  Modal,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import uuid from 'react-native-uuid';
 
-import { CatchEvent, FishFinderData, GpsData, WeatherData } from '../models/Event';
+import { CatchEvent, FishFinderData, GpsData, GpsMark, MarkType, WeatherData } from '../models/Event';
 import { getCurrentPosition } from '../services/gpsService';
 import { fetchWeatherData, fetchWindHistory, fetchPressureHistory } from '../services/weatherService';
 import { computeHydroScore } from '../agents/hydrodynamicAgent';
-import { insertEvent, updateEvent } from '../storage/localDB';
+import { insertEvent, updateEvent, insertMark } from '../storage/localDB';
 import { formatEventCode } from '../utils/formatters';
 import WeatherWaterCard from '../components/WeatherWaterCard';
 import FishFinderModal from '../components/FishFinderModal';
@@ -29,6 +31,10 @@ export default function CaptainScreen() {
   const [fishOnLoading, setFishOnLoading] = useState(false);
   const [fishOnMessage, setFishOnMessage] = useState<string | null>(null);
   const [fishFinderEvent, setFishFinderEvent] = useState<CatchEvent | null>(null);
+  const [markLoading, setMarkLoading] = useState<MarkType | null>(null);
+  const [markMessage, setMarkMessage] = useState<string | null>(null);
+  const [otherModalVisible, setOtherModalVisible] = useState(false);
+  const [otherNote, setOtherNote] = useState('');
 
   useEffect(() => {
     loadTripConditions();
@@ -39,6 +45,12 @@ export default function CaptainScreen() {
     const t = setTimeout(() => setFishOnMessage(null), 4000);
     return () => clearTimeout(t);
   }, [fishOnMessage]);
+
+  useEffect(() => {
+    if (!markMessage) return;
+    const t = setTimeout(() => setMarkMessage(null), 4000);
+    return () => clearTimeout(t);
+  }, [markMessage]);
 
   const loadTripConditions = async () => {
     setTripConditionsLoading(true);
@@ -170,6 +182,71 @@ export default function CaptainScreen() {
     setFishOnMessage(`${code} — conditions captured! Mate can now join to add photo.`);
   }, [fishFinderEvent]);
 
+  const handleMark = useCallback(async (type: MarkType, notes?: string) => {
+    setMarkLoading(type);
+    try {
+      const gps = await getCurrentPosition();
+      const gpsData = gps || defaultGps();
+      const catchLat = gpsData.lat || 44.88702;
+      const catchLng = gpsData.lng || -80.066101;
+
+      const [weather, windHistory, pressureHistory, prey] = await Promise.all([
+        fetchWeatherData(catchLat, catchLng),
+        fetchWindHistory(catchLat, catchLng),
+        fetchPressureHistory(catchLat, catchLng),
+        fetchPreyData(catchLat, catchLng),
+      ]);
+
+      const weatherData = weather || defaultWeather();
+      const hydroScore = computeHydroScore({
+        windSpeed: weatherData.windSpeed,
+        windDirection: weatherData.windDirection,
+        waveHeight: weatherData.waveHeight,
+        airTemp: weatherData.airTemp,
+        waterTemp: weatherData.waterTemp,
+        pressure: weatherData.pressure,
+        lat: gpsData.lat,
+        lng: gpsData.lng,
+        chlorophyll: prey.chlorophyll,
+        turbidity: prey.turbidity,
+        windHistory,
+        pressureHistory,
+      });
+
+      const mark: GpsMark = {
+        id: uuid.v4() as string,
+        markType: type,
+        notes,
+        timestamp: new Date().toISOString(),
+        gps: gpsData,
+        weather: weatherData,
+        hydroScore,
+        synced: false,
+      };
+
+      await insertMark(mark);
+      const labels: Record<MarkType, string> = {
+        bait: 'Bait marked',
+        fish: 'Fish marked',
+        fish_bait: 'Fish + Bait marked',
+        structure: 'Structure marked',
+        other: 'Location marked',
+      };
+      setMarkMessage(`${labels[type]} — conditions captured`);
+    } catch (err) {
+      console.error('[Captain] handleMark error:', err);
+      setMarkMessage('Mark failed. Try again.');
+    } finally {
+      setMarkLoading(null);
+    }
+  }, []);
+
+  const handleOtherConfirm = useCallback(() => {
+    setOtherModalVisible(false);
+    handleMark('other', otherNote.trim() || undefined);
+    setOtherNote('');
+  }, [otherNote, handleMark]);
+
   return (
     <ScrollView
       style={styles.container}
@@ -208,6 +285,64 @@ export default function CaptainScreen() {
           <Text style={styles.fishOnBannerText}>🎣 {fishOnMessage}</Text>
         </TouchableOpacity>
       )}
+
+      {/* ── Mark Location ── */}
+      <View style={styles.markSection}>
+        <Text style={styles.markSectionTitle}>Mark Location</Text>
+        <View style={styles.markGrid}>
+          {([
+            { type: 'bait',      icon: '🦐', label: 'Bait'         },
+            { type: 'fish',      icon: '🐟', label: 'Fish'         },
+            { type: 'fish_bait', icon: '🎯', label: 'Fish + Bait'  },
+            { type: 'structure', icon: '⛰️', label: 'Structure'    },
+            { type: 'other',     icon: '📍', label: 'Other'        },
+          ] as { type: MarkType; icon: string; label: string }[]).map(({ type, icon, label }) => (
+            <TouchableOpacity
+              key={type}
+              style={[styles.markButton, markLoading === type && styles.markButtonDisabled]}
+              onPress={() => type === 'other' ? setOtherModalVisible(true) : handleMark(type)}
+              disabled={markLoading !== null}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.markIcon}>{markLoading === type ? '⏳' : icon}</Text>
+              <Text style={styles.markLabel}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {markMessage && (
+        <TouchableOpacity style={styles.markBanner} onPress={() => setMarkMessage(null)} activeOpacity={0.8}>
+          <Text style={styles.markBannerText}>📍 {markMessage}</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* ── Other note modal ── */}
+      <Modal visible={otherModalVisible} transparent animationType="fade" onRequestClose={() => setOtherModalVisible(false)}>
+        <View style={styles.otherOverlay}>
+          <View style={styles.otherBox}>
+            <Text style={styles.otherTitle}>What are you marking?</Text>
+            <TextInput
+              style={styles.otherInput}
+              value={otherNote}
+              onChangeText={setOtherNote}
+              placeholder="e.g. Tide rip, colour change..."
+              placeholderTextColor="#4a5f7a"
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={handleOtherConfirm}
+            />
+            <View style={styles.otherButtons}>
+              <TouchableOpacity style={styles.otherCancel} onPress={() => setOtherModalVisible(false)}>
+                <Text style={styles.otherCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.otherConfirm} onPress={handleOtherConfirm}>
+                <Text style={styles.otherConfirmText}>Mark</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <TouchableOpacity style={styles.infoBox} onPress={() => setHowItWorksOpen((v) => !v)} activeOpacity={0.7}>
         <View style={styles.infoTitleRow}>
@@ -341,5 +476,121 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
     marginTop: 10,
+  },
+  markSection: {
+    marginHorizontal: 24,
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  markSectionTitle: {
+    color: '#8899aa',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 10,
+  },
+  markGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  markButton: {
+    width: '30%',
+    flexGrow: 1,
+    backgroundColor: '#122040',
+    borderWidth: 1,
+    borderColor: '#1a2d4a',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  markButtonDisabled: {
+    opacity: 0.5,
+  },
+  markIcon: {
+    fontSize: 22,
+    marginBottom: 4,
+  },
+  markLabel: {
+    color: '#c0d0e0',
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  markBanner: {
+    backgroundColor: '#1a2a3a',
+    marginHorizontal: 24,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#1e90ff',
+  },
+  markBannerText: {
+    color: '#7ec8ff',
+    fontSize: 13,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  otherOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  otherBox: {
+    backgroundColor: '#122040',
+    borderRadius: 16,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#1a2d4a',
+  },
+  otherTitle: {
+    color: '#ffffff',
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  otherInput: {
+    backgroundColor: '#0a1628',
+    borderWidth: 1,
+    borderColor: '#1a2d4a',
+    borderRadius: 10,
+    color: '#ffffff',
+    fontSize: 15,
+    padding: 12,
+    marginBottom: 16,
+  },
+  otherButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  otherCancel: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#8899aa',
+    borderRadius: 10,
+    padding: 12,
+    alignItems: 'center',
+  },
+  otherCancelText: {
+    color: '#8899aa',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  otherConfirm: {
+    flex: 1,
+    backgroundColor: '#1e90ff',
+    borderRadius: 10,
+    padding: 12,
+    alignItems: 'center',
+  },
+  otherConfirmText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

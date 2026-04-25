@@ -17,10 +17,11 @@ import { useFocusEffect } from 'expo-router';
 
 const Audio = Platform.OS !== 'web' ? require('expo-av').Audio : null;
 
-import { CatchEvent } from '../models/Event';
-import { getAllEvents } from '../storage/localDB';
+import { CatchEvent, GpsMark } from '../models/Event';
+import { getAllEvents, getAllMarks } from '../storage/localDB';
 import { generateTripInsight } from '../agents/catchClassifier';
 import CatchCard from '../components/CatchCard';
+import MarkCard from '../components/MarkCard';
 import HydroScoreCard from '../components/HydroScoreCard';
 import WeatherWidget from '../components/WeatherWidget';
 import {
@@ -31,8 +32,11 @@ import {
   formatDuration,
 } from '../utils/formatters';
 
+type FeedItem = { type: 'catch'; data: CatchEvent } | { type: 'mark'; data: GpsMark };
+
 export default function TripLogScreen() {
   const [events, setEvents] = useState<CatchEvent[]>([]);
+  const [feed, setFeed] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CatchEvent | null>(null);
@@ -44,8 +48,13 @@ export default function TripLogScreen() {
 
   const loadEvents = useCallback(async () => {
     try {
-      const all = await getAllEvents();
-      setEvents(all);
+      const [allEvents, allMarks] = await Promise.all([getAllEvents(), getAllMarks()]);
+      setEvents(allEvents);
+      const merged: FeedItem[] = [
+        ...allEvents.map((e): FeedItem => ({ type: 'catch', data: e })),
+        ...allMarks.map((m): FeedItem => ({ type: 'mark', data: m })),
+      ].sort((a, b) => b.data.timestamp.localeCompare(a.data.timestamp));
+      setFeed(merged);
     } catch (error) {
       console.error('[TripLog] loadEvents error:', error);
     } finally {
@@ -156,15 +165,16 @@ export default function TripLogScreen() {
     }
   }, [events]);
 
-  const renderEventItem = useCallback(
-    ({ item }: { item: CatchEvent }) => (
-      <CatchCard event={item} onPress={handleEventPress} />
-    ),
+  const renderFeedItem = useCallback(
+    ({ item }: { item: FeedItem }) =>
+      item.type === 'catch'
+        ? <CatchCard event={item.data} onPress={handleEventPress} />
+        : <MarkCard mark={item.data} />,
     [handleEventPress]
   );
 
   const keyExtractor = useCallback(
-    (item: CatchEvent) => item.id,
+    (item: FeedItem) => item.data.id,
     []
   );
 
@@ -230,7 +240,7 @@ export default function TripLogScreen() {
       ) : null}
 
       {/* Events list */}
-      {events.length === 0 ? (
+      {feed.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyIcon}>🎣</Text>
           <Text style={styles.emptyTitle}>No catches yet</Text>
@@ -240,8 +250,8 @@ export default function TripLogScreen() {
         </View>
       ) : (
         <FlatList
-          data={events}
-          renderItem={renderEventItem}
+          data={feed}
+          renderItem={renderFeedItem}
           keyExtractor={keyExtractor}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}

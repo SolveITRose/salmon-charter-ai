@@ -80,6 +80,20 @@ export interface CatchEvent {
   syncedAt?: string;
 }
 
+export type MarkType = 'bait' | 'fish' | 'fish_bait' | 'structure' | 'other';
+
+export interface GpsMark {
+  id: string;
+  markType: MarkType;
+  notes?: string;
+  timestamp: string;
+  gps: GpsData;
+  weather: WeatherData;
+  hydroScore: HydroScore;
+  synced: boolean;
+  syncedAt?: string;
+}
+
 export interface WindHistory {
   timestamp: string;
   windSpeed: number;   // km/h
