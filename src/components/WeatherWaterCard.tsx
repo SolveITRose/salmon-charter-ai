@@ -233,6 +233,10 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
           value={conditions.cloud_cover_pct !== null ? `${conditions.cloud_cover_pct}%` : '—'}
         />
         <Row
+          label="Precipitation"
+          value={conditions.precipitation_mm !== null ? `${conditions.precipitation_mm} mm` : '—'}
+        />
+        <Row
           label="Visibility"
           value={conditions.visibility_km !== null ? `${conditions.visibility_km} km` : '—'}
         />

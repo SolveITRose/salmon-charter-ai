@@ -18,6 +18,7 @@ export interface TripConditions {
   air_temp_c: number | null;
   cloud_cover_pct: number | null;
   precipitation_type: string | null;
+  precipitation_mm: number | null;
   visibility_km: number | null;
   wave_height_ft: number | null;
   wave_period_dominant_s: number | null;
@@ -268,6 +269,7 @@ async function fetchOWMAtmospheric(
       conditions_text:          owm.weather?.[0]?.description
                                   ? capitalize(owm.weather[0].description) : null,
       cloud_cover_pct:          owm.clouds?.all ?? null,
+      precipitation_mm:         r1(owm.rain?.['1h'] ?? owm.rain?.['3h'] ?? null),
       visibility_km:            owm.visibility != null ? r1(owm.visibility / 1000) : null,
       wave_height_ft:           r1(marine.wave_height != null ? marine.wave_height * 3.281 : null),
       wave_period_dominant_s:   r1(marine.wave_period ?? null),
@@ -425,6 +427,7 @@ async function fetchOWM(lat: number, lng: number): Promise<Partial<TripCondition
     return {
       cloud_cover_pct:    daily.clouds ?? null,
       precipitation_type: precipType,
+      precipitation_mm:   daily.rain != null ? r1(daily.rain) : null,
       moon_phase_value:   moonPhase !== null ? r1(moonPhase) : null,
       moon_phase_label:   moonPhase !== null ? moonPhaseLabelFrom(moonPhase) : null,
       moonrise_time:      daily.moonrise ? unixToLocalHHMM(daily.moonrise) : null,
@@ -690,6 +693,7 @@ export async function fetchTripConditions(
     air_temp_c:               ndbc.air_temp_c               ?? null,
     cloud_cover_pct:          owm.cloud_cover_pct           ?? owmAtmo.cloud_cover_pct ?? null,
     precipitation_type:       owm.precipitation_type        ?? null,
+    precipitation_mm:         owm.precipitation_mm          ?? owmAtmo.precipitation_mm ?? null,
     visibility_km:            ndbc.visibility_km            ?? null,
     wave_height_ft:           ndbc.wave_height_ft           ?? null,
     wave_period_dominant_s:   ndbc.wave_period_dominant_s   ?? null,
