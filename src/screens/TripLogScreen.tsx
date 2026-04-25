@@ -403,9 +403,6 @@ export default function TripLogScreen() {
                     {selectedEvent.fishFinder.speedOverGround !== undefined && (
                       <SetupRow label="SOG" value={`${Math.round(selectedEvent.fishFinder.speedOverGround)} mph`} />
                     )}
-                    {selectedEvent.fishFinder.courseOverGround !== undefined && (
-                      <SetupRow label="COG" value={`${Math.round(selectedEvent.fishFinder.courseOverGround)}°`} />
-                    )}
                     {selectedEvent.fishFinder.heading !== undefined && (
                       <SetupRow label="Heading" value={`${Math.round(selectedEvent.fishFinder.heading)}°`} />
                     )}
