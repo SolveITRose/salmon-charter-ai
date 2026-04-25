@@ -15,7 +15,7 @@ import { CatchEvent, FishFinderData, GpsData, GpsMark, MarkType, WeatherData } f
 import { getCurrentPosition } from '../services/gpsService';
 import { fetchWeatherData, fetchWindHistory, fetchPressureHistory } from '../services/weatherService';
 import { computeHydroScore } from '../agents/hydrodynamicAgent';
-import { insertEvent, updateEvent, insertMark } from '../storage/localDB';
+import { insertEvent, updateEvent, insertMark, updateMark } from '../storage/localDB';
 import { formatEventCode } from '../utils/formatters';
 import WeatherWaterCard from '../components/WeatherWaterCard';
 import FishFinderModal from '../components/FishFinderModal';
@@ -35,6 +35,7 @@ export default function CaptainScreen() {
   const [markMessage, setMarkMessage] = useState<string | null>(null);
   const [otherModalVisible, setOtherModalVisible] = useState(false);
   const [otherNote, setOtherNote] = useState('');
+  const [pendingMarkForScan, setPendingMarkForScan] = useState<GpsMark | null>(null);
 
   useEffect(() => {
     loadTripConditions();
@@ -238,14 +239,7 @@ export default function CaptainScreen() {
       };
 
       await insertMark(mark);
-      const labels: Record<MarkType, string> = {
-        bait: 'Bait marked',
-        fish: 'Fish marked',
-        fish_bait: 'Fish + Bait marked',
-        structure: 'Structure marked',
-        other: 'Location marked',
-      };
-      setMarkMessage(`${labels[type]} — conditions captured`);
+      setPendingMarkForScan(mark);
     } catch (err) {
       console.error('[Captain] handleMark error:', err);
       setMarkMessage('Mark failed. Try again.');
@@ -260,6 +254,32 @@ export default function CaptainScreen() {
     setOtherNote('');
   }, [otherNote, handleMark]);
 
+  const MARK_LABELS: Record<MarkType, string> = {
+    bait: 'Bait marked',
+    fish: 'Fish marked',
+    fish_bait: 'Fish + Bait marked',
+    structure: 'Structure marked',
+    other: 'Location marked',
+  };
+
+  const handleMarkFinderSave = useCallback(async (data: FishFinderData) => {
+    if (!pendingMarkForScan) return;
+    try {
+      await updateMark({ ...pendingMarkForScan, fishFinder: data });
+    } catch (err) {
+      console.warn('[Captain] handleMarkFinderSave error:', err);
+    } finally {
+      setMarkMessage(`${MARK_LABELS[pendingMarkForScan.markType]} — fish finder captured`);
+      setPendingMarkForScan(null);
+    }
+  }, [pendingMarkForScan]);
+
+  const handleMarkFinderSkip = useCallback(() => {
+    if (!pendingMarkForScan) return;
+    setMarkMessage(`${MARK_LABELS[pendingMarkForScan.markType]} — conditions captured`);
+    setPendingMarkForScan(null);
+  }, [pendingMarkForScan]);
+
   return (
     <ScrollView
       style={styles.container}
@@ -272,6 +292,14 @@ export default function CaptainScreen() {
           event={fishFinderEvent}
           onSave={handleFishFinderSave}
           onSkip={handleFishFinderSkip}
+        />
+      )}
+      {pendingMarkForScan && (
+        <FishFinderModal
+          visible={true}
+          event={pendingMarkForScan}
+          onSave={handleMarkFinderSave}
+          onSkip={handleMarkFinderSkip}
         />
       )}
       <WeatherWaterCard

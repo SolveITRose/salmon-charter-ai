@@ -281,6 +281,14 @@ export async function insertMark(mark: GpsMark): Promise<void> {
   );
 }
 
+export async function updateMark(mark: GpsMark): Promise<void> {
+  const database = await getDB();
+  await database.runAsync(
+    `UPDATE gps_marks SET mark_type = ?, timestamp = ?, data = ?, synced = ? WHERE id = ?`,
+    [mark.markType, mark.timestamp, JSON.stringify(mark), mark.synced ? 1 : 0, mark.id]
+  );
+}
+
 export async function getAllMarks(): Promise<GpsMark[]> {
   const database = await getDB();
   const rows = await database.getAllAsync<{ data: string }>(

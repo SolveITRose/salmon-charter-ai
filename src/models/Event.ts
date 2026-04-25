@@ -90,6 +90,7 @@ export interface GpsMark {
   gps: GpsData;
   weather: WeatherData;
   hydroScore: HydroScore;
+  fishFinder?: FishFinderData;
   synced: boolean;
   syncedAt?: string;
 }

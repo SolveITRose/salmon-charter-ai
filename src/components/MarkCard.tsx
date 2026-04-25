@@ -38,6 +38,14 @@ const MarkCard = memo(function MarkCard({ mark, onPress }: MarkCardProps) {
         <Text style={styles.conditions}>
           {mark.weather.conditions} · {Math.round(mark.weather.airTemp)}°C
         </Text>
+        {mark.fishFinder && (
+          <Text style={styles.fishFinder}>
+            🖥{mark.fishFinder.depth != null ? ` ${mark.fishFinder.depth}ft` : ''}
+            {mark.fishFinder.waterTemp != null ? ` · ${mark.fishFinder.waterTemp}°C` : ''}
+            {mark.fishFinder.speedOverGround != null ? ` · ${mark.fishFinder.speedOverGround}mph` : ''}
+            {mark.fishFinder.baitOnScreen === true ? ' · bait ✓' : ''}
+          </Text>
+        )}
       </View>
 
       <View style={styles.scoreContainer}>
@@ -100,6 +108,11 @@ const styles = StyleSheet.create({
   conditions: {
     color: '#8899aa',
     fontSize: 11,
+  },
+  fishFinder: {
+    color: '#1e90ff',
+    fontSize: 11,
+    marginTop: 2,
   },
   scoreContainer: {
     alignItems: 'center',

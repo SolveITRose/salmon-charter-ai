@@ -112,6 +112,10 @@ async function writeMarks(marks: GpsMark[]): Promise<void> {
   await AsyncStorage.setItem(MARKS_KEY, JSON.stringify(marks));
 }
 
+export async function updateMark(mark: GpsMark): Promise<void> {
+  await insertMark(mark);
+}
+
 export async function insertMark(mark: GpsMark): Promise<void> {
   const marks = await readMarks();
   const idx = marks.findIndex((m) => m.id === mark.id);

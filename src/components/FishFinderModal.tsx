@@ -11,12 +11,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { CatchEvent, FishFinderData } from '../models/Event';
+import { FishFinderData, GpsData, WeatherData } from '../models/Event';
 import { parseFishFinderScreen } from '../agents/fishFinderParser';
 
 interface FishFinderModalProps {
   visible: boolean;
-  event: CatchEvent;
+  event: { gps: GpsData; weather: WeatherData };
   onSave: (data: FishFinderData) => void;
   onSkip: () => void;
 }
