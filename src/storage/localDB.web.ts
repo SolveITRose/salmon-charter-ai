@@ -1,9 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CatchEvent } from '../models/Event';
+import { CatchEvent, GpsMark } from '../models/Event';
 import { TripConditions } from '../services/weatherWaterService';
 
 const EVENTS_KEY = 'catch_events';
 const CONDITIONS_KEY = 'trip_conditions';
+const MARKS_KEY = 'gps_marks';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -94,6 +95,39 @@ export async function getEventCount(): Promise<number> {
 export async function getPendingBiteEvents(): Promise<CatchEvent[]> {
   const events = await readEvents();
   return events.filter((e) => e.status === 'bite');
+}
+
+// ─── GPS Marks ───────────────────────────────────────────────────────────────
+
+async function readMarks(): Promise<GpsMark[]> {
+  try {
+    const raw = await AsyncStorage.getItem(MARKS_KEY);
+    return raw ? (JSON.parse(raw) as GpsMark[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeMarks(marks: GpsMark[]): Promise<void> {
+  await AsyncStorage.setItem(MARKS_KEY, JSON.stringify(marks));
+}
+
+export async function insertMark(mark: GpsMark): Promise<void> {
+  const marks = await readMarks();
+  const idx = marks.findIndex((m) => m.id === mark.id);
+  if (idx !== -1) {
+    marks[idx] = mark;
+  } else {
+    marks.unshift(mark);
+  }
+  await writeMarks(marks);
+}
+
+export async function getAllMarks(): Promise<GpsMark[]> {
+  const marks = await readMarks();
+  return [...marks].sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+  );
 }
 
 export async function saveTripConditions(
