@@ -190,28 +190,41 @@ export default function CaptainScreen() {
       const catchLat = gpsData.lat || 44.88702;
       const catchLng = gpsData.lng || -80.066101;
 
-      const [weather, windHistory, pressureHistory, prey] = await Promise.all([
-        fetchWeatherData(catchLat, catchLng),
-        fetchWindHistory(catchLat, catchLng),
-        fetchPressureHistory(catchLat, catchLng),
-        fetchPreyData(catchLat, catchLng),
-      ]);
-
-      const weatherData = weather || defaultWeather();
-      const hydroScore = computeHydroScore({
-        windSpeed: weatherData.windSpeed,
-        windDirection: weatherData.windDirection,
-        waveHeight: weatherData.waveHeight,
-        airTemp: weatherData.airTemp,
-        waterTemp: weatherData.waterTemp,
-        pressure: weatherData.pressure,
-        lat: gpsData.lat,
-        lng: gpsData.lng,
-        chlorophyll: prey.chlorophyll,
-        turbidity: prey.turbidity,
-        windHistory,
-        pressureHistory,
+      // Weather + HydroScore are best-effort — a failed API call never blocks the mark
+      let weatherData = defaultWeather();
+      let hydroScore = computeHydroScore({
+        windSpeed: 0, windDirection: 0, waveHeight: 0,
+        airTemp: 15, waterTemp: 13, pressure: 1013,
+        lat: catchLat, lng: catchLng,
+        chlorophyll: null, turbidity: null,
+        windHistory: [], pressureHistory: [],
       });
+
+      try {
+        const [weather, windHistory, pressureHistory, prey] = await Promise.all([
+          fetchWeatherData(catchLat, catchLng),
+          fetchWindHistory(catchLat, catchLng),
+          fetchPressureHistory(catchLat, catchLng),
+          fetchPreyData(catchLat, catchLng),
+        ]);
+        weatherData = weather || defaultWeather();
+        hydroScore = computeHydroScore({
+          windSpeed: weatherData.windSpeed,
+          windDirection: weatherData.windDirection,
+          waveHeight: weatherData.waveHeight,
+          airTemp: weatherData.airTemp,
+          waterTemp: weatherData.waterTemp,
+          pressure: weatherData.pressure,
+          lat: gpsData.lat,
+          lng: gpsData.lng,
+          chlorophyll: prey?.chlorophyll ?? null,
+          turbidity: prey?.turbidity ?? null,
+          windHistory: windHistory ?? [],
+          pressureHistory: pressureHistory ?? [],
+        });
+      } catch (weatherErr) {
+        console.warn('[Captain] handleMark weather fetch failed, using defaults:', weatherErr);
+      }
 
       const mark: GpsMark = {
         id: uuid.v4() as string,
