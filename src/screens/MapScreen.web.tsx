@@ -160,7 +160,7 @@ export default function MapScreen() {
                     </div>
                     {e.setup.lureType ? (
                       <div style={{ color: '#555', fontSize: 12, marginTop: 4 }}>
-                        {e.setup.lureType} {e.setup.lureColor ? `(${e.setup.lureColor})` : ''} @ {e.setup.downriggerDepth}ft
+                        {e.setup.lureType} {e.setup.lureColor ? `(${e.setup.lureColor})` : ''} @ {Math.round(e.setup.downriggerDepth)}ft
                       </div>
                     ) : null}
                   </div>

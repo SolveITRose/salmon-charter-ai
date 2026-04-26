@@ -348,7 +348,7 @@ export default function MapScreen() {
               {selectedEvent.setup.lureColor
                 ? `(${selectedEvent.setup.lureColor})`
                 : ''}{' '}
-              @ {selectedEvent.setup.downriggerDepth}ft
+              @ {Math.round(selectedEvent.setup.downriggerDepth)}ft
             </Text>
           )}
         </View>

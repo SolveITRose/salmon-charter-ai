@@ -289,14 +289,14 @@ export default function MateScreen() {
 
         <View style={styles.confirmedSummary}>
           <Text style={styles.summaryItem}>
-            Depth: {currentEvent.setup.downriggerDepth} ft
+            Depth: {Math.round(currentEvent.setup.downriggerDepth)} ft
             {currentEvent.setup.backFromBall ? ` · ${currentEvent.setup.backFromBall} ft back` : ''}
           </Text>
           <Text style={styles.summaryItem}>
             Lure: {currentEvent.setup.lureType}
             {currentEvent.setup.lureColor ? ` (${currentEvent.setup.lureColor})` : ''}
           </Text>
-          <Text style={styles.summaryItem}>Speed: {currentEvent.setup.trollingSpeed} mph</Text>
+          <Text style={styles.summaryItem}>Speed: {Math.round(currentEvent.setup.trollingSpeed)} mph</Text>
           {currentEvent.setup.rigType ? (
             <Text style={styles.summaryItem}>
               Rig: {currentEvent.setup.rigType}
