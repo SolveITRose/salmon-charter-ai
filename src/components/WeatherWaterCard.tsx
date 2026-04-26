@@ -206,13 +206,13 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
           label="Wind"
           value={
             conditions.wind_speed_mph !== null
-              ? `${conditions.wind_speed_mph.toFixed(2)} mph ${conditions.wind_direction_label ?? ''}`
+              ? `${Math.round(conditions.wind_speed_mph * 1.60934)} km/h ${conditions.wind_direction_label ?? ''}`
               : '—'
           }
         />
         <Row
           label="Gusts"
-          value={conditions.wind_gust_mph !== null ? `${conditions.wind_gust_mph.toFixed(2)} mph` : '—'}
+          value={conditions.wind_gust_mph !== null ? `${Math.round(conditions.wind_gust_mph * 1.60934)} km/h` : '—'}
         />
         <Row
           label="Conditions"

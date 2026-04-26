@@ -38,7 +38,7 @@ const WeatherWidget = memo(function WeatherWidget({
       <View style={styles.item}>
         <Text style={styles.itemLabel}>Wind</Text>
         <Text style={styles.itemValue}>
-          {windArrow} {(weather.windSpeed * 0.621371).toFixed(2)} mph {windDir}
+          {windArrow} {Math.round(weather.windSpeed)} km/h {windDir}
         </Text>
       </View>
 
