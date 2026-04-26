@@ -73,7 +73,7 @@ const CatchCard = memo(function CatchCard({ event, onPress }: CatchCardProps) {
       {/* HydroScore mini gauge */}
       <View style={styles.scoreContainer}>
         <Text style={[styles.scoreValue, { color: scoreColor }]}>
-          {event.hydroScore.total}
+          {Math.round(event.hydroScore.total)}
         </Text>
         <Text style={styles.scoreLabel}>Hydro</Text>
         <View style={styles.scoreMiniBar}>

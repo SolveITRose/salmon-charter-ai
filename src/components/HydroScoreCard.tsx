@@ -42,7 +42,7 @@ const SubScoreRow = memo(function SubScoreRow({
         />
       </View>
       <Text style={[styles.subScoreValue, { color }]}>
-        {value}/{max}
+        {Math.round(value)}/{max}
       </Text>
     </View>
   );
@@ -65,7 +65,7 @@ const HydroScoreCard = memo(function HydroScoreCard({
         <View style={styles.headerRow}>
           <View style={styles.scoreNumRow}>
             <Text style={[styles.scoreNumber, { color: scoreColor }]}>
-              {hydroScore.total}
+              {Math.round(hydroScore.total)}
             </Text>
             <Text style={styles.scoreMax}>/100</Text>
           </View>
