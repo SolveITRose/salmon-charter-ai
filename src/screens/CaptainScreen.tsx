@@ -396,7 +396,13 @@ export default function CaptainScreen() {
             2. GPS, weather, and HydroScore captured instantly{'\n'}
             3. Share the event code with your mate{'\n'}
             4. Mate joins the event, adds photo and rig setup{'\n'}
-            5. AI identifies species from the mate's photo
+            5. AI identifies species from the mate's photo{'\n\n'}
+            Mark Types:{'\n'}
+            🦐 Bait — baitfish activity on sonar or sighted{'\n'}
+            🐟 Fish — fish at this position, no bait{'\n'}
+            🎯 Fish + Bait — fish and bait on the same mark{'\n'}
+            ⛰️ Structure — notable bottom feature (ledge, reef, drop-off){'\n'}
+            📍 Other — custom note, e.g. strong current, colour change
           </Text>
         )}
       </TouchableOpacity>
