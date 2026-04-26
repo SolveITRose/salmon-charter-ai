@@ -100,7 +100,7 @@ export default function EventJoinModal({
                     </View>
                     <View style={styles.eventRowRight}>
                       <Text style={[styles.eventScore, { color: getScoreColor(item.hydroScore.total) }]}>
-                        {item.hydroScore.total}
+                        {Math.round(item.hydroScore.total)}
                       </Text>
                       <Text style={styles.eventScoreLabel}>score</Text>
                     </View>

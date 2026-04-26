@@ -225,7 +225,7 @@ export default function MapScreen() {
                 onPress={() => setSelectedEvent(m.event)}
                 pinColor={getScoreColor(m.event.hydroScore.total)}
                 title={m.event.species}
-                description={`Score: ${m.event.hydroScore.total} · ${formatTimestamp(m.event.timestamp)}`}
+                description={`Score: ${Math.round(m.event.hydroScore.total)} · ${formatTimestamp(m.event.timestamp)}`}
               />
               {/* HydroScore radius circle */}
               <Circle
@@ -339,7 +339,7 @@ export default function MapScreen() {
                 { color: getScoreColor(selectedEvent.hydroScore.total) },
               ]}
             >
-              {selectedEvent.hydroScore.total}/100
+              {Math.round(selectedEvent.hydroScore.total)}/100
             </Text>
           </View>
           {selectedEvent.setup.lureType && (

@@ -40,9 +40,9 @@ const MarkCard = memo(function MarkCard({ mark, onPress }: MarkCardProps) {
         </Text>
         {mark.fishFinder && (
           <Text style={styles.fishFinder}>
-            🖥{mark.fishFinder.depth != null ? ` ${mark.fishFinder.depth}ft` : ''}
+            🖥{mark.fishFinder.depth != null ? ` ${Math.round(mark.fishFinder.depth)}ft` : ''}
             {mark.fishFinder.waterTemp != null ? ` · ${Math.round(celsiusToFahrenheit(mark.fishFinder.waterTemp))}°F` : ''}
-            {mark.fishFinder.speedOverGround != null ? ` · ${mark.fishFinder.speedOverGround}mph` : ''}
+            {mark.fishFinder.speedOverGround != null ? ` · ${Math.round(mark.fishFinder.speedOverGround)}mph` : ''}
             {mark.fishFinder.baitOnScreen === true ? ' · bait ✓' : ''}
           </Text>
         )}
@@ -50,7 +50,7 @@ const MarkCard = memo(function MarkCard({ mark, onPress }: MarkCardProps) {
 
       <View style={styles.scoreContainer}>
         <Text style={[styles.scoreValue, { color: scoreColor }]}>
-          {mark.hydroScore.total}
+          {Math.round(mark.hydroScore.total)}
         </Text>
         <Text style={styles.scoreLabel}>Hydro</Text>
         <View style={styles.scoreMiniBar}>

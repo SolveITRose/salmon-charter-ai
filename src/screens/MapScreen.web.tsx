@@ -156,7 +156,7 @@ export default function MapScreen() {
                     <div style={{ color: '#666', fontSize: 12, marginBottom: 6 }}>{formatGPS(e.gps.lat, e.gps.lng)}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ color: '#888', fontSize: 12 }}>HydroScore:</span>
-                      <span style={{ color, fontWeight: 'bold', fontSize: 14 }}>{e.hydroScore.total}/100</span>
+                      <span style={{ color, fontWeight: 'bold', fontSize: 14 }}>{Math.round(e.hydroScore.total)}/100</span>
                     </div>
                     {e.setup.lureType ? (
                       <div style={{ color: '#555', fontSize: 12, marginTop: 4 }}>
