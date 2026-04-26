@@ -12,9 +12,10 @@ import {
   Image,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 import { CatchEvent, SetupData } from '../models/Event';
 import { updateEvent } from '../storage/localDB';
-import { saveEventPhoto, saveEventSnapshot } from '../storage/eventStore';
+import { saveEventSnapshot } from '../storage/eventStore';
 import { classifyCatch } from '../agents/catchClassifier';
 import { syncAllPending } from '../services/syncService';
 import EventJoinModal from '../components/EventJoinModal';
@@ -134,9 +135,14 @@ export default function MateScreen() {
       };
 
       if (photoUri) {
-        const savedPhotoPath = Platform.OS === 'web'
-          ? photoUri
-          : await saveEventPhoto(currentEvent.eventCode, photoUri);
+        let savedPhotoPath = photoUri;
+        if (Platform.OS !== 'web') {
+          const { status } = await MediaLibrary.requestPermissionsAsync();
+          if (status === 'granted') {
+            const asset = await MediaLibrary.createAssetAsync(photoUri);
+            savedPhotoPath = asset.uri;
+          }
+        }
 
         let classification = classificationFallback;
         if (Platform.OS !== 'web') {

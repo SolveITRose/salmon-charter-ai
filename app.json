@@ -21,7 +21,9 @@
         "NSCameraUsageDescription": "Required to photograph catch for AI species identification and event logging.",
         "NSMicrophoneUsageDescription": "Required to record voice notes about catch setup and conditions.",
         "NSLocationWhenInUseUsageDescription": "Required to capture GPS coordinates at time of catch.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Required to log GPS coordinates continuously during fishing trips."
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Required to log GPS coordinates continuously during fishing trips.",
+        "NSPhotoLibraryAddUsageDescription": "Catch photos are saved to your photo library for persistent access in the trip log.",
+        "NSPhotoLibraryUsageDescription": "Required to save and display catch photos from your photo library."
       }
     },
     "android": {
