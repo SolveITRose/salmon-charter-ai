@@ -42,7 +42,7 @@ const MarkCard = memo(function MarkCard({ mark, onPress }: MarkCardProps) {
           <Text style={styles.fishFinder}>
             🖥{mark.fishFinder.depth != null ? ` ${Math.round(mark.fishFinder.depth)}ft` : ''}
             {mark.fishFinder.waterTemp != null ? ` · ${Math.round(celsiusToFahrenheit(mark.fishFinder.waterTemp))}°F` : ''}
-            {mark.fishFinder.speedOverGround != null ? ` · ${Math.round(mark.fishFinder.speedOverGround)}mph` : ''}
+            {mark.fishFinder.speedOverGround != null ? ` · ${mark.fishFinder.speedOverGround.toFixed(2)}mph` : ''}
             {mark.fishFinder.baitOnScreen === true ? ' · bait ✓' : ''}
           </Text>
         )}

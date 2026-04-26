@@ -302,7 +302,7 @@ export default function MateScreen() {
             Lure: {currentEvent.setup.lureType}
             {currentEvent.setup.lureColor ? ` (${currentEvent.setup.lureColor})` : ''}
           </Text>
-          <Text style={styles.summaryItem}>Speed: {Math.round(currentEvent.setup.trollingSpeed)} mph</Text>
+          <Text style={styles.summaryItem}>Speed: {currentEvent.setup.trollingSpeed.toFixed(2)} mph</Text>
           {currentEvent.setup.rigType ? (
             <Text style={styles.summaryItem}>
               Rig: {currentEvent.setup.rigType}

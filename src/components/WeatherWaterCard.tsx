@@ -206,13 +206,13 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
           label="Wind"
           value={
             conditions.wind_speed_mph !== null
-              ? `${Math.round(conditions.wind_speed_mph)} mph ${conditions.wind_direction_label ?? ''}`
+              ? `${conditions.wind_speed_mph.toFixed(2)} mph ${conditions.wind_direction_label ?? ''}`
               : '—'
           }
         />
         <Row
           label="Gusts"
-          value={conditions.wind_gust_mph !== null ? `${Math.round(conditions.wind_gust_mph)} mph` : '—'}
+          value={conditions.wind_gust_mph !== null ? `${conditions.wind_gust_mph.toFixed(2)} mph` : '—'}
         />
         <Row
           label="Conditions"
@@ -268,7 +268,7 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
           {[...conditions.previous_wind].reverse().map((w, i) => (
             <View key={i} style={styles.windHistoryRow}>
               <Text style={[styles.windHistoryCol, styles.windHistoryColTime, styles.windHistoryVal]}>{w.time}</Text>
-              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{Math.round(w.speed_mph)} {w.direction_label}</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.speed_mph.toFixed(2)} {w.direction_label}</Text>
               <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.temp_c != null ? cToF(w.temp_c) : '—'}</Text>
               <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.cloud_cover_pct != null ? `${w.cloud_cover_pct}%` : '—'}</Text>
               <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.precipitation_mm != null && w.precipitation_mm > 0 ? `${Math.round(w.precipitation_mm)}mm` : '—'}</Text>
@@ -309,7 +309,7 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
         />
         <Row
           label="Current Speed"
-          value={conditions.current_speed_knots !== null ? `${Math.round(conditions.current_speed_knots)} kn` : '—'}
+          value={conditions.current_speed_knots !== null ? `${conditions.current_speed_knots.toFixed(2)} kn` : '—'}
         />
         <Row
           label="Current Direction"

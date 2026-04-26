@@ -86,7 +86,7 @@ export function formatGPS(lat: number, lng: number): string {
  * Output: "5.2 kts"
  */
 export function formatSpeed(knots: number): string {
-  return `${Math.round(knots)} kts`;
+  return `${knots.toFixed(2)} kts`;
 }
 
 /**
