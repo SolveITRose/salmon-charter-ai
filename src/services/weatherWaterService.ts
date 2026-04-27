@@ -303,7 +303,7 @@ async function fetchPreviousWind(
     const url =
       `https://api.open-meteo.com/v1/forecast` +
       `?latitude=${lat}&longitude=${lng}` +
-      `&hourly=wind_speed_10m,wind_direction_10m,temperature_2m,cloud_cover,precipitation,surface_pressure` +
+      `&hourly=wind_speed_10m,wind_direction_10m,temperature_2m,cloud_cover,precipitation,pressure_msl` +
       `&wind_speed_unit=mph` +
       `&start_date=${startDate}&end_date=${endDate}`;
     const res = await fetchWithTimeout(url, {}, 10000);
@@ -315,7 +315,7 @@ async function fetchPreviousWind(
     const temps: number[] = data.hourly?.temperature_2m ?? [];
     const clouds: number[] = data.hourly?.cloud_cover ?? [];
     const precips: number[] = data.hourly?.precipitation ?? [];
-    const pressures: number[] = data.hourly?.surface_pressure ?? [];
+    const pressures: number[] = data.hourly?.pressure_msl ?? [];
 
     const nowHour = now.getTime();
     return times
@@ -675,14 +675,14 @@ async function fetchPressureTrend(
     const url =
       `https://api.open-meteo.com/v1/forecast` +
       `?latitude=${lat}&longitude=${lng}` +
-      `&hourly=surface_pressure` +
+      `&hourly=pressure_msl` +
       `&start_date=${past.toISOString().split('T')[0]}&end_date=${now.toISOString().split('T')[0]}`;
     const res = await fetchWithTimeout(url, {}, 8000);
     if (!res.ok) return null;
     const data = await res.json();
 
     const times: string[] = data.hourly?.time ?? [];
-    const pressures: number[] = data.hourly?.surface_pressure ?? [];
+    const pressures: number[] = data.hourly?.pressure_msl ?? [];
 
     const nowMs  = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours()).getTime();
     const agoMs  = nowMs - 3 * 60 * 60 * 1000;
