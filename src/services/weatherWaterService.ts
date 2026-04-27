@@ -745,8 +745,8 @@ async function fetchPressureTrend(
     if (cur === null || ago === null) return null;
 
     const delta = cur - ago;
-    if (delta > 0.5)  return 'rising';
-    if (delta < -0.5) return 'falling';
+    if (delta > 0.1)  return 'rising';
+    if (delta < -0.1) return 'falling';
     return 'steady';
   } catch {
     return null;
