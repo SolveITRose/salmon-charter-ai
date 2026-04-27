@@ -19,6 +19,7 @@ interface Props {
   conditions: TripConditions | null;
   loading: boolean;
   onRetry?: () => void;
+  nearestCity?: string | null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -134,7 +135,18 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
   conditions,
   loading,
   onRetry,
+  nearestCity,
 }: Props) {
+  const coordsLabel = conditions
+    ? (() => {
+        const lat = conditions.query_lat;
+        const lng = conditions.query_lng;
+        const latStr = `${Math.abs(lat).toFixed(3)}°${lat >= 0 ? 'N' : 'S'}`;
+        const lngStr = `${Math.abs(lng).toFixed(3)}°${lng >= 0 ? 'E' : 'W'}`;
+        const coords = `${latStr} ${lngStr}`;
+        return nearestCity ? `${coords}, ${nearestCity}` : coords;
+      })()
+    : null;
   if (loading) {
     return (
       <View style={styles.card}>
@@ -193,7 +205,7 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
       </Text>
 
       {/* 1. Wind & Sky */}
-      <Section title="Wind & Sky">
+      <Section title={coordsLabel ? `Wind & Sky  ·  ${coordsLabel}` : 'Wind & Sky'}>
         <Row
           label="Pressure"
           value={
@@ -257,7 +269,7 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
 
       {/* 2. Weather History */}
       {conditions.previous_wind && conditions.previous_wind.length > 0 && (
-        <Section title="Weather History (last 24h)">
+        <Section title={coordsLabel ? `Weather History (last 24h, ${coordsLabel})` : 'Weather History (last 24h)'}>
           <View style={styles.windHistoryHeader}>
             <Text style={[styles.windHistoryCol, styles.windHistoryColTime]}>Time</Text>
             <Text style={styles.windHistoryCol}>km/h</Text>
@@ -265,17 +277,15 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
             <Text style={styles.windHistoryCol}>Temp</Text>
             <Text style={styles.windHistoryCol}>Cloud</Text>
             <Text style={styles.windHistoryCol}>Precip</Text>
-            <Text style={styles.windHistoryCol}>hPa</Text>
           </View>
           {[...conditions.previous_wind].reverse().map((w, i) => (
             <View key={i} style={styles.windHistoryRow}>
               <Text style={[styles.windHistoryCol, styles.windHistoryColTime, styles.windHistoryVal]}>{w.time}</Text>
               <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{Math.round(w.speed_mph * 1.60934)}</Text>
-              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.direction_deg}°</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.direction_deg}°{'\n'}{w.direction_label}</Text>
               <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.temp_c != null ? cToF(w.temp_c) : '—'}</Text>
               <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.cloud_cover_pct != null ? `${w.cloud_cover_pct}%` : '—'}</Text>
               <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.precipitation_mm != null && w.precipitation_mm > 0 ? `${Math.round(w.precipitation_mm)}mm` : '—'}</Text>
-              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.pressure_hpa != null ? `${w.pressure_hpa}` : '—'}</Text>
             </View>
           ))}
         </Section>
@@ -533,7 +543,7 @@ const styles = StyleSheet.create({
   windHistoryCol: {
     flex: 1,
     color: '#8899aa',
-    fontSize: 9,
+    fontSize: 10,
   },
   windHistoryColTime: {
     flex: 1.2,

@@ -1,6 +1,7 @@
 export interface WaterBodyInfo {
   name: string | null;
   type: 'river' | 'stream' | 'lake' | 'bay' | 'unknown';
+  nearestCity: string | null;
   waterLevel_m: number | null;
   flow_cms: number | null;
   gaugeStation: string | null;
@@ -28,7 +29,7 @@ async function getJSON(url: string, headers: Record<string, string> = {}): Promi
 async function lookupWaterBody(
   lat: number,
   lng: number,
-): Promise<{ name: string | null; type: WaterBodyInfo['type'] }> {
+): Promise<{ name: string | null; type: WaterBodyInfo['type']; nearestCity: string | null }> {
   try {
     const data = (await getJSON(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14`,
@@ -40,26 +41,29 @@ async function lookupWaterBody(
     const addr = (data.address as Record<string, string>) ?? {};
     const displayName = (data.name as string) ?? null;
 
+    const nearestCity =
+      addr.city ?? addr.town ?? addr.village ?? addr.municipality ?? addr.county ?? null;
+
     if (cls === 'waterway' || typ === 'river')
-      return { name: displayName ?? addr.river ?? null, type: 'river' };
+      return { name: displayName ?? addr.river ?? null, type: 'river', nearestCity };
     if (typ === 'stream' || typ === 'creek')
-      return { name: displayName ?? addr.stream ?? null, type: 'stream' };
+      return { name: displayName ?? addr.stream ?? null, type: 'stream', nearestCity };
     if (typ === 'bay')
-      return { name: displayName ?? addr.bay ?? null, type: 'bay' };
+      return { name: displayName ?? addr.bay ?? null, type: 'bay', nearestCity };
     if (cls === 'natural' && (typ === 'water' || typ === 'lake'))
-      return { name: displayName ?? addr.lake ?? addr.water ?? null, type: 'lake' };
+      return { name: displayName ?? addr.lake ?? addr.water ?? null, type: 'lake', nearestCity };
 
     // Check address object for water references
-    if (addr.river)  return { name: addr.river,  type: 'river' };
-    if (addr.stream) return { name: addr.stream, type: 'stream' };
-    if (addr.bay)    return { name: addr.bay,    type: 'bay' };
-    if (addr.lake)   return { name: addr.lake,   type: 'lake' };
-    if (addr.water)  return { name: addr.water,  type: 'unknown' };
+    if (addr.river)  return { name: addr.river,  type: 'river',   nearestCity };
+    if (addr.stream) return { name: addr.stream, type: 'stream',  nearestCity };
+    if (addr.bay)    return { name: addr.bay,    type: 'bay',     nearestCity };
+    if (addr.lake)   return { name: addr.lake,   type: 'lake',    nearestCity };
+    if (addr.water)  return { name: addr.water,  type: 'unknown', nearestCity };
 
-    return { name: null, type: 'unknown' };
+    return { name: null, type: 'unknown', nearestCity };
   } catch (err) {
     console.warn('[WaterBody] Nominatim failed:', err);
-    return { name: null, type: 'unknown' };
+    return { name: null, type: 'unknown', nearestCity: null };
   }
 }
 
@@ -148,14 +152,14 @@ function isCanada(lat: number, lng: number): boolean {
 // ── Main export ────────────────────────────────────────────────────────────
 
 export async function fetchWaterBodyInfo(lat: number, lng: number): Promise<WaterBodyInfo> {
-  const { name, type } = await lookupWaterBody(lat, lng);
+  const { name, type, nearestCity } = await lookupWaterBody(lat, lng);
 
   const isRiver = type === 'river' || type === 'stream';
-  if (!isRiver) return { name, type, ...NO_GAUGE };
+  if (!isRiver) return { name, type, nearestCity, ...NO_GAUGE };
 
   const gauge = isCanada(lat, lng)
     ? await fetchECCCGauge(lat, lng)
     : await fetchUSGSGauge(lat, lng);
 
-  return { name, type, ...gauge };
+  return { name, type, nearestCity, ...gauge };
 }

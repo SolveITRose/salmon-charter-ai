@@ -42,6 +42,12 @@ function fullCardinal(deg: number): string {
   return dirs[Math.round(deg / 45) % 8];
 }
 
+function formatCoords(lat: number, lng: number): string {
+  const latStr = `${Math.abs(lat).toFixed(3)}°${lat >= 0 ? 'N' : 'S'}`;
+  const lngStr = `${Math.abs(lng).toFixed(3)}°${lng >= 0 ? 'E' : 'W'}`;
+  return `${latStr} ${lngStr}`;
+}
+
 const COUNTER_KEY = 'event_counter';
 
 export default function CaptainScreen() {
@@ -50,6 +56,7 @@ export default function CaptainScreen() {
   const [conditionsExpanded, setConditionsExpanded] = useState(false);
   const [waterBodyInfo, setWaterBodyInfo] = useState<WaterBodyInfo | null>(null);
   const [fmzInfo, setFmzInfo] = useState<FMZInfo | null>(null);
+  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [speciesModalVisible, setSpeciesModalVisible] = useState(false);
   const [fishOnLoading, setFishOnLoading] = useState(false);
   const [fishOnMessage, setFishOnMessage] = useState<string | null>(null);
@@ -82,6 +89,7 @@ export default function CaptainScreen() {
       const gps = await getCurrentPosition();
       const lat = gps?.lat || 44.88702;
       const lng = gps?.lng || -80.066101;
+      setGpsCoords({ lat, lng });
       const date = new Date().toISOString().split('T')[0];
       const [conditions, waterBody] = await Promise.all([
         fetchTripConditions(lat, lng, date),
@@ -423,6 +431,12 @@ export default function CaptainScreen() {
               {waterBodyInfo?.name ? (
                 <Text style={styles.conditionsWaterName}>{`  ·  ${waterBodyInfo.name}`}</Text>
               ) : null}
+              {gpsCoords ? (
+                <Text style={styles.conditionsWaterName}>{`  ·  ${formatCoords(gpsCoords.lat, gpsCoords.lng)}`}</Text>
+              ) : null}
+              {waterBodyInfo?.nearestCity ? (
+                <Text style={styles.conditionsWaterName}>{`  ·  ${waterBodyInfo.nearestCity}`}</Text>
+              ) : null}
             </Text>
             <Text style={styles.conditionsChevron}>{conditionsExpanded ? '▲' : '▼'}</Text>
           </View>
@@ -466,6 +480,12 @@ export default function CaptainScreen() {
                     : 'None'}
                 </Text>
               </View>
+              <View style={styles.conditionsStat}>
+                <Text style={styles.conditionsStatLabel}>Air Temp</Text>
+                <Text style={styles.conditionsStatValue}>
+                  {tripConditions.air_temp_c !== null ? cToF(tripConditions.air_temp_c) : '—'}
+                </Text>
+              </View>
               {waterBodyInfo?.waterLevel_m !== null && waterBodyInfo?.waterLevel_m !== undefined && (
                 <View style={styles.conditionsStat}>
                   <Text style={styles.conditionsStatLabel}>River Level</Text>
@@ -490,6 +510,7 @@ export default function CaptainScreen() {
           conditions={tripConditions}
           loading={tripConditionsLoading}
           onRetry={loadTripConditions}
+          nearestCity={waterBodyInfo?.nearestCity ?? null}
         />
       )}
 
