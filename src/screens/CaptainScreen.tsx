@@ -504,15 +504,6 @@ export default function CaptainScreen() {
         </View>
       )}
 
-      {/* ── Garmin Marine Maps ── */}
-      <TouchableOpacity
-        style={styles.garminButton}
-        onPress={() => Linking.openURL('https://maps.garmin.com/en-US/marine/?maps=garmin&overlay=false&key=dpzp51t00psz')}
-        activeOpacity={0.75}
-      >
-        <Text style={styles.garminButtonText}>🗺  Garmin Marine Charts →</Text>
-      </TouchableOpacity>
-
       {/* ── Other note modal ── */}
       <Modal visible={otherModalVisible} transparent animationType="fade" onRequestClose={() => setOtherModalVisible(false)}>
         <View style={styles.otherOverlay}>
@@ -836,21 +827,6 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     textTransform: 'none',
     letterSpacing: 0,
-  },
-  garminButton: {
-    backgroundColor: '#122040',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#1a2d4a',
-    paddingVertical: 13,
-    paddingHorizontal: 16,
-    marginTop: 8,
-    alignItems: 'center',
-  },
-  garminButtonText: {
-    color: '#1e90ff',
-    fontSize: 14,
-    fontWeight: '600',
   },
   regsDisclaimer: {
     color: '#1e90ff',
