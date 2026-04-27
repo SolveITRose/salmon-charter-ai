@@ -78,11 +78,14 @@ const LAKE_BOXES = [
   { id: 'ontario',      latMin: 43.1, latMax: 44.4, lngMin: -79.9, lngMax: -76.0 },
 ];
 
-function determineLake(lat: number, lng: number): { lakeId: string; stationId: string } {
+function determineLake(lat: number, lng: number): { lakeId: string; stationId: string; nearestBuoyKm: number } {
   const match = LAKE_BOXES.find(
     (b) => lat >= b.latMin && lat <= b.latMax && lng >= b.lngMin && lng <= b.lngMax,
   );
-  if (match) return { lakeId: match.id, stationId: STATIONS[match.id].id };
+  if (match) {
+    const s = STATIONS[match.id];
+    return { lakeId: match.id, stationId: s.id, nearestBuoyKm: haversineKm(lat, lng, s.lat, s.lng) };
+  }
 
   let nearestId = 'georgian_bay';
   let minDist = Infinity;
@@ -90,7 +93,7 @@ function determineLake(lat: number, lng: number): { lakeId: string; stationId: s
     const d = haversineKm(lat, lng, s.lat, s.lng);
     if (d < minDist) { minDist = d; nearestId = id; }
   }
-  return { lakeId: nearestId, stationId: STATIONS[nearestId].id };
+  return { lakeId: nearestId, stationId: STATIONS[nearestId].id, nearestBuoyKm: minDist };
 }
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -707,10 +710,15 @@ export async function fetchTripConditions(
   lng: number,
   date: string,
 ): Promise<TripConditions> {
-  const { lakeId, stationId } = determineLake(lat, lng);
+  const { lakeId, stationId, nearestBuoyKm } = determineLake(lat, lng);
+
+  // Skip NDBC if the nearest buoy is more than 200 km away — buoy data that
+  // far from the user's location is meaningless. OWM atmospheric is GPS-based
+  // and works anywhere in the world.
+  const skipNDBC = nearestBuoyKm > 200;
 
   const [ndbcRaw, owm, owmAtmo, solunar, glerl, prey, nws, uv, prevWind, astro, currents, pressureTrend] = await Promise.all([
-    fetchNDBC(stationId),
+    skipNDBC ? Promise.resolve(null) : fetchNDBC(stationId),
     fetchOWM(lat, lng),
     fetchOWMAtmospheric(lat, lng),
     fetchSolunar(lat, lng, date),
