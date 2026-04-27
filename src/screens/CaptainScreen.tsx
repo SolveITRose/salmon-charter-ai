@@ -27,6 +27,13 @@ function cToF(c: number | null): string {
   return `${Math.round(celsiusToFahrenheit(c))}°F`;
 }
 
+function trendArrow(trend: TripConditions['pressure_trend']): string {
+  if (trend === 'rising')  return ' ↑';
+  if (trend === 'falling') return ' ↓';
+  if (trend === 'steady')  return ' →';
+  return '';
+}
+
 const COUNTER_KEY = 'event_counter';
 
 export default function CaptainScreen() {
@@ -61,8 +68,9 @@ export default function CaptainScreen() {
   const loadTripConditions = async () => {
     setTripConditionsLoading(true);
     try {
-      const lat = 44.88702;
-      const lng = -80.066101;
+      const gps = await getCurrentPosition();
+      const lat = gps?.lat || 44.88702;
+      const lng = gps?.lng || -80.066101;
       const date = new Date().toISOString().split('T')[0];
       const conditions = await fetchTripConditions(lat, lng, date);
       setTripConditions(conditions);
@@ -375,18 +383,47 @@ export default function CaptainScreen() {
         activeOpacity={0.75}
       >
         <View style={styles.conditionsStripLeft}>
-          <Text style={styles.conditionsStripLabel}>Conditions</Text>
+          <View style={styles.conditionsStripHeader}>
+            <Text style={styles.conditionsStripLabel}>Conditions</Text>
+            <Text style={styles.conditionsChevron}>{conditionsExpanded ? '▲' : '▼'}</Text>
+          </View>
           {tripConditionsLoading ? (
             <Text style={styles.conditionsStripData}>Loading...</Text>
           ) : tripConditions ? (
-            <Text style={styles.conditionsStripData} numberOfLines={1}>
-              {`💨 ${tripConditions.wind_speed_mph !== null ? Math.round(tripConditions.wind_speed_mph * 1.60934) + ' km/h' : '—'} ${tripConditions.wind_direction_label ?? ''}  ·  🌡 ${cToF(tripConditions.sst_buoy_c ?? tripConditions.sst_satellite_c)}  ·  ${tripConditions.conditions_text ?? ''}`}
-            </Text>
+            <View style={styles.conditionsGrid}>
+              <View style={styles.conditionsStat}>
+                <Text style={styles.conditionsStatLabel}>Pressure</Text>
+                <Text style={styles.conditionsStatValue}>
+                  {tripConditions.barometric_pressure_hpa !== null
+                    ? `${Math.round(tripConditions.barometric_pressure_hpa)} hPa${trendArrow(tripConditions.pressure_trend)}`
+                    : '—'}
+                </Text>
+              </View>
+              <View style={styles.conditionsStat}>
+                <Text style={styles.conditionsStatLabel}>Wind</Text>
+                <Text style={styles.conditionsStatValue}>
+                  {tripConditions.wind_speed_mph !== null
+                    ? `${Math.round(tripConditions.wind_speed_mph * 1.60934)} km/h ${tripConditions.wind_direction_label ?? ''}`
+                    : '—'}
+                </Text>
+              </View>
+              <View style={styles.conditionsStat}>
+                <Text style={styles.conditionsStatLabel}>Cloud Cover</Text>
+                <Text style={styles.conditionsStatValue}>
+                  {tripConditions.cloud_cover_pct !== null ? `${tripConditions.cloud_cover_pct}%` : '—'}
+                </Text>
+              </View>
+              <View style={styles.conditionsStat}>
+                <Text style={styles.conditionsStatLabel}>Water Temp</Text>
+                <Text style={styles.conditionsStatValue}>
+                  {cToF(tripConditions.sst_buoy_c ?? tripConditions.sst_satellite_c)}
+                </Text>
+              </View>
+            </View>
           ) : (
-            <Text style={styles.conditionsStripData}>Tap to load</Text>
+            <Text style={styles.conditionsStripData}>Tap to view full conditions</Text>
           )}
         </View>
-        <Text style={styles.conditionsChevron}>{conditionsExpanded ? '▲' : '▼'}</Text>
       </TouchableOpacity>
 
       {conditionsExpanded && (
@@ -541,7 +578,12 @@ const styles = StyleSheet.create({
   },
   conditionsStripLeft: {
     flex: 1,
-    marginRight: 8,
+  },
+  conditionsStripHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
   },
   conditionsStripLabel: {
     color: '#1e90ff',
@@ -549,15 +591,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.6,
-    marginBottom: 3,
   },
   conditionsStripData: {
-    color: '#c0d0e0',
+    color: '#8899aa',
     fontSize: 13,
   },
   conditionsChevron: {
     color: '#1e90ff',
     fontSize: 12,
+  },
+  conditionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  conditionsStat: {
+    width: '47%',
+  },
+  conditionsStatLabel: {
+    color: '#8899aa',
+    fontSize: 11,
+    marginBottom: 2,
+  },
+  conditionsStatValue: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   markSection: {
     marginHorizontal: 24,
