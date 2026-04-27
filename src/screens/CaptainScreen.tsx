@@ -633,15 +633,18 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   fishOnText: {
-    color: '#ffffff',
-    fontSize: 28,
-    fontWeight: 'bold',
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 14,
+    fontWeight: '600',
     marginBottom: 4,
     letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   fishOnSub: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 13,
+    color: '#ffffff',
+    fontSize: 26,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
   fishOnBanner: {
     backgroundColor: '#1b3a1b',
