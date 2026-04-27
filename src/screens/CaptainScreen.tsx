@@ -30,9 +30,9 @@ function cToF(c: number | null): string {
 }
 
 function trendArrow(trend: TripConditions['pressure_trend']): string {
-  if (trend === 'rising')  return ' ↑';
-  if (trend === 'falling') return ' ↓';
-  if (trend === 'steady')  return ' →';
+  if (trend === 'rising')  return ' · Rising ↑';
+  if (trend === 'falling') return ' · Falling ↓';
+  if (trend === 'steady')  return ' · Steady';
   return '';
 }
 
