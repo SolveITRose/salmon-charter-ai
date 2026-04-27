@@ -121,7 +121,10 @@ export default function CaptainScreen() {
     fetchedAt: new Date().toISOString(),
   });
 
-  const handleFishOn = useCallback(async () => {
+  const [fishOnSide, setFishOnSide] = useState<'Port' | 'Starboard' | null>(null);
+
+  const handleFishOn = useCallback(async (side: 'Port' | 'Starboard') => {
+    setFishOnSide(side);
     setFishOnLoading(true);
     try {
       const [gps, counter] = await Promise.all([
@@ -167,7 +170,7 @@ export default function CaptainScreen() {
         photo: '',
         gps: gpsData,
         weather: weatherData,
-        setup: { downriggerDepth: 0, lureType: '', lureColor: '', trollingSpeed: 0 },
+        setup: { downriggerDepth: 0, lureType: '', lureColor: '', trollingSpeed: 0, boatSide: side },
         voiceNote: { audioPath: '', transcript: '', duration: 0 },
         hydroScore,
         species: '',
@@ -185,6 +188,7 @@ export default function CaptainScreen() {
       setFishOnMessage('Failed to record bite. Try again.');
     } finally {
       setFishOnLoading(false);
+      setFishOnSide(null);
     }
   }, []);
 
@@ -337,18 +341,32 @@ export default function CaptainScreen() {
       )}
 
       {/* ── Fish On! ── */}
-      <TouchableOpacity
-        style={[styles.fishOnButton, fishOnLoading && styles.fishOnButtonDisabled]}
-        onPress={handleFishOn}
-        activeOpacity={0.8}
-        disabled={fishOnLoading}
-      >
-        <Text style={styles.fishOnIcon}>🎣</Text>
-        <Text style={styles.fishOnText}>
-          {fishOnLoading ? 'Capturing...' : 'FISH ON!'}
-        </Text>
-        <Text style={styles.fishOnSub}>Tap the moment a fish strikes</Text>
-      </TouchableOpacity>
+      <View style={styles.fishOnRow}>
+        <TouchableOpacity
+          style={[styles.fishOnButton, styles.fishOnPort, fishOnLoading && styles.fishOnButtonDisabled]}
+          onPress={() => handleFishOn('Port')}
+          activeOpacity={0.8}
+          disabled={fishOnLoading}
+        >
+          <Text style={styles.fishOnIcon}>🎣</Text>
+          <Text style={styles.fishOnText}>
+            {fishOnLoading && fishOnSide === 'Port' ? 'Capturing...' : 'PORT'}
+          </Text>
+          <Text style={styles.fishOnSub}>Fish On!</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.fishOnButton, styles.fishOnStarboard, fishOnLoading && styles.fishOnButtonDisabled]}
+          onPress={() => handleFishOn('Starboard')}
+          activeOpacity={0.8}
+          disabled={fishOnLoading}
+        >
+          <Text style={styles.fishOnIcon}>🎣</Text>
+          <Text style={styles.fishOnText}>
+            {fishOnLoading && fishOnSide === 'Starboard' ? 'Capturing...' : 'STARBOARD'}
+          </Text>
+          <Text style={styles.fishOnSub}>Fish On!</Text>
+        </TouchableOpacity>
+      </View>
 
       {fishOnMessage && (
         <TouchableOpacity style={styles.fishOnBanner} onPress={() => setFishOnMessage(null)} activeOpacity={0.8}>
@@ -584,18 +602,28 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
-  fishOnButton: {
-    backgroundColor: '#e65100',
-    marginHorizontal: 24,
-    borderRadius: 16,
-    padding: 28,
-    alignItems: 'center',
+  fishOnRow: {
+    flexDirection: 'row',
+    gap: 10,
     marginBottom: 12,
-    shadowColor: '#ff6d00',
+  },
+  fishOnButton: {
+    flex: 1,
+    borderRadius: 16,
+    padding: 22,
+    alignItems: 'center',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 12,
     elevation: 8,
+  },
+  fishOnPort: {
+    backgroundColor: '#c62828',
+    shadowColor: '#ff1744',
+  },
+  fishOnStarboard: {
+    backgroundColor: '#1b5e20',
+    shadowColor: '#00e676',
   },
   fishOnButtonDisabled: {
     opacity: 0.6,
