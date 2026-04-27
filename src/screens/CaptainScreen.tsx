@@ -22,6 +22,7 @@ import FishFinderModal from '../components/FishFinderModal';
 import { fetchTripConditions, fetchPreyData, TripConditions } from '../services/weatherWaterService';
 import { saveTripConditions } from '../storage/localDB';
 import { fetchWaterBodyInfo, WaterBodyInfo } from '../services/waterBodyService';
+import { getFMZInfo, FMZInfo } from '../data/ontarioFMZ';
 
 function cToF(c: number | null): string {
   if (c === null) return '—';
@@ -42,6 +43,7 @@ export default function CaptainScreen() {
   const [tripConditionsLoading, setTripConditionsLoading] = useState(false);
   const [conditionsExpanded, setConditionsExpanded] = useState(false);
   const [waterBodyInfo, setWaterBodyInfo] = useState<WaterBodyInfo | null>(null);
+  const [fmzInfo, setFmzInfo] = useState<FMZInfo | null>(null);
   const [fishOnLoading, setFishOnLoading] = useState(false);
   const [fishOnMessage, setFishOnMessage] = useState<string | null>(null);
   const [fishFinderEvent, setFishFinderEvent] = useState<CatchEvent | null>(null);
@@ -80,6 +82,7 @@ export default function CaptainScreen() {
       ]);
       setTripConditions(conditions);
       setWaterBodyInfo(waterBody);
+      setFmzInfo(getFMZInfo(lat, lng));
       await saveTripConditions(new Date().toISOString(), conditions);
     } catch (err) {
       console.warn('[Captain] loadTripConditions failed:', err);
@@ -457,6 +460,43 @@ export default function CaptainScreen() {
         />
       )}
 
+      {/* ── Ontario Fishing Regulations ── */}
+      {fmzInfo && (
+        <View style={styles.regsCard}>
+          <View style={styles.regsHeader}>
+            <Text style={styles.regsTitle}>{`FMZ ${fmzInfo.zone}  ·  ${fmzInfo.name}`}</Text>
+            <Text style={styles.regsSource}>2024–25</Text>
+          </View>
+          {fmzInfo.rules.length > 0 ? (
+            <>
+              <View style={styles.regsTableHeader}>
+                <Text style={[styles.regsCol, styles.regsColSpecies]}>Species</Text>
+                <Text style={styles.regsCol}>Season</Text>
+                <Text style={styles.regsColRight}>Limit</Text>
+              </View>
+              {fmzInfo.rules.map((rule, i) => (
+                <View key={i} style={[styles.regsRow, i % 2 === 1 && styles.regsRowAlt]}>
+                  <Text style={[styles.regsCol, styles.regsColSpecies, styles.regsSpeciesText]}>
+                    {rule.species}
+                  </Text>
+                  <Text style={[styles.regsCol, styles.regsValueText]}>
+                    {rule.season}
+                  </Text>
+                  <Text style={[styles.regsColRight, styles.regsValueText]}>
+                    {rule.minSize ? `${rule.limit}  ·  ${rule.minSize} min` : rule.limit}
+                  </Text>
+                </View>
+              ))}
+              <Text style={styles.regsDisclaimer}>Verify at ontario.ca/fishing before your trip.</Text>
+            </>
+          ) : (
+            <Text style={styles.regsDisclaimer}>
+              {`No inline data for FMZ ${fmzInfo.zone}. Check ontario.ca/fishing.`}
+            </Text>
+          )}
+        </View>
+      )}
+
       {/* ── Other note modal ── */}
       <Modal visible={otherModalVisible} transparent animationType="fade" onRequestClose={() => setOtherModalVisible(false)}>
         <View style={styles.otherOverlay}>
@@ -704,6 +744,89 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     fontWeight: '600',
+  },
+  regsCard: {
+    backgroundColor: '#122040',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1a2d4a',
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  regsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a2d4a',
+  },
+  regsTitle: {
+    color: '#1e90ff',
+    fontSize: 12,
+    fontWeight: '700',
+    flex: 1,
+  },
+  regsSource: {
+    color: '#4a6080',
+    fontSize: 11,
+  },
+  regsTableHeader: {
+    flexDirection: 'row',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a2d4a',
+  },
+  regsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  regsRowAlt: {
+    backgroundColor: '#0f1c33',
+  },
+  regsCol: {
+    flex: 1,
+    color: '#8899aa',
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  regsColSpecies: {
+    flex: 1.2,
+  },
+  regsColRight: {
+    flex: 1.4,
+    textAlign: 'right',
+    color: '#8899aa',
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  regsSpeciesText: {
+    color: '#c0d0e0',
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'none',
+    letterSpacing: 0,
+  },
+  regsValueText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '400',
+    textTransform: 'none',
+    letterSpacing: 0,
+  },
+  regsDisclaimer: {
+    color: '#4a6080',
+    fontSize: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    fontStyle: 'italic',
   },
   otherOverlay: {
     flex: 1,
