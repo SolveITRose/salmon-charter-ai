@@ -37,6 +37,11 @@ function trendArrow(trend: TripConditions['pressure_trend']): string {
   return '';
 }
 
+function fullCardinal(deg: number): string {
+  const dirs = ['North', 'Northeast', 'East', 'Southeast', 'South', 'Southwest', 'West', 'Northwest'];
+  return dirs[Math.round(deg / 45) % 8];
+}
+
 const COUNTER_KEY = 'event_counter';
 
 export default function CaptainScreen() {
@@ -434,10 +439,16 @@ export default function CaptainScreen() {
                 </Text>
               </View>
               <View style={styles.conditionsStat}>
-                <Text style={styles.conditionsStatLabel}>Wind</Text>
+                <Text style={styles.conditionsStatLabel}>Wind Direction</Text>
+                <Text style={styles.conditionsStatValue}>
+                  {tripConditions.wind_direction_deg !== null
+                    ? `${Math.round(tripConditions.wind_direction_deg)}° ${fullCardinal(tripConditions.wind_direction_deg)}`
+                    : '—'}
+                </Text>
+                <Text style={[styles.conditionsStatLabel, { marginTop: 8 }]}>Wind Speed</Text>
                 <Text style={styles.conditionsStatValue}>
                   {tripConditions.wind_speed_mph !== null
-                    ? `${Math.round(tripConditions.wind_speed_mph * 1.60934)} km/h ${tripConditions.wind_direction_label ?? ''}`
+                    ? `${Math.round(tripConditions.wind_speed_mph * 1.60934)} km/h`
                     : '—'}
                 </Text>
               </View>
