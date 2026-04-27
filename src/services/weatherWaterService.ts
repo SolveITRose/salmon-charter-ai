@@ -652,6 +652,48 @@ async function fetchMarineCurrents(
   }
 }
 
+// ── Pressure trend fallback (Open-Meteo, used when NDBC is offline) ──────────
+
+async function fetchPressureTrend(
+  lat: number,
+  lng: number,
+): Promise<TripConditions['pressure_trend']> {
+  try {
+    const now = new Date();
+    const past = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+    const url =
+      `https://api.open-meteo.com/v1/forecast` +
+      `?latitude=${lat}&longitude=${lng}` +
+      `&hourly=surface_pressure` +
+      `&start_date=${past.toISOString().split('T')[0]}&end_date=${now.toISOString().split('T')[0]}`;
+    const res = await fetchWithTimeout(url, {}, 8000);
+    if (!res.ok) return null;
+    const data = await res.json();
+
+    const times: string[] = data.hourly?.time ?? [];
+    const pressures: number[] = data.hourly?.surface_pressure ?? [];
+
+    const nowMs  = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours()).getTime();
+    const agoMs  = nowMs - 3 * 60 * 60 * 1000;
+
+    const nowIdx = times.reduce((best, t, i) =>
+      Math.abs(new Date(t).getTime() - nowMs) < Math.abs(new Date(times[best]).getTime() - nowMs) ? i : best, 0);
+    const agoIdx = times.reduce((best, t, i) =>
+      Math.abs(new Date(t).getTime() - agoMs) < Math.abs(new Date(times[best]).getTime() - agoMs) ? i : best, 0);
+
+    const cur = pressures[nowIdx] ?? null;
+    const ago = pressures[agoIdx] ?? null;
+    if (cur === null || ago === null) return null;
+
+    const delta = cur - ago;
+    if (delta > 0.5)  return 'rising';
+    if (delta < -0.5) return 'falling';
+    return 'steady';
+  } catch {
+    return null;
+  }
+}
+
 // ── Main Export ────────────────────────────────────────────────────────────
 
 export async function fetchTripConditions(
@@ -661,7 +703,7 @@ export async function fetchTripConditions(
 ): Promise<TripConditions> {
   const { lakeId, stationId } = determineLake(lat, lng);
 
-  const [ndbcRaw, owm, owmAtmo, solunar, glerl, prey, nws, uv, prevWind, astro, currents] = await Promise.all([
+  const [ndbcRaw, owm, owmAtmo, solunar, glerl, prey, nws, uv, prevWind, astro, currents, pressureTrend] = await Promise.all([
     fetchNDBC(stationId),
     fetchOWM(lat, lng),
     fetchOWMAtmospheric(lat, lng),
@@ -673,6 +715,7 @@ export async function fetchTripConditions(
     fetchPreviousWind(lat, lng),
     fetchAstroTimes(lat, lng, new Date()),
     lakeId === 'georgian_bay' ? fetchMarineCurrents(lat, lng) : Promise.resolve({ current_speed_knots: null, current_direction_deg: null, current_direction_label: null }),
+    fetchPressureTrend(lat, lng),
   ]);
 
   // Fall back to OWM atmospheric if NDBC station has no realtime data (e.g. Canadian buoys)
@@ -687,7 +730,7 @@ export async function fetchTripConditions(
     query_lng:                lng,
     barometric_pressure_hpa:  ndbc.barometric_pressure_hpa  ?? null,
     pressure_tendency_hpa:    ndbc.pressure_tendency_hpa    ?? null,
-    pressure_trend:           ndbc.pressure_trend           ?? null,
+    pressure_trend:           ndbc.pressure_trend           ?? pressureTrend ?? null,
     wind_speed_mph:           ndbc.wind_speed_mph           ?? null,
     wind_direction_deg:       ndbc.wind_direction_deg       ?? null,
     wind_direction_label:     ndbc.wind_direction_label     ?? null,
