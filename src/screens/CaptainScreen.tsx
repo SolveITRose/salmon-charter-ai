@@ -45,6 +45,7 @@ export default function CaptainScreen() {
   const [conditionsExpanded, setConditionsExpanded] = useState(false);
   const [waterBodyInfo, setWaterBodyInfo] = useState<WaterBodyInfo | null>(null);
   const [fmzInfo, setFmzInfo] = useState<FMZInfo | null>(null);
+  const [speciesModalVisible, setSpeciesModalVisible] = useState(false);
   const [fishOnLoading, setFishOnLoading] = useState(false);
   const [fishOnMessage, setFishOnMessage] = useState<string | null>(null);
   const [fishFinderEvent, setFishFinderEvent] = useState<CatchEvent | null>(null);
@@ -504,6 +505,46 @@ export default function CaptainScreen() {
         </View>
       )}
 
+      {/* ── Species in this area button ── */}
+      {fmzInfo && fmzInfo.rules.length > 0 && (
+        <TouchableOpacity
+          style={styles.speciesButton}
+          onPress={() => setSpeciesModalVisible(true)}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.speciesButtonText}>🐟  Species in this area</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* ── Species modal ── */}
+      <Modal
+        visible={speciesModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSpeciesModalVisible(false)}
+      >
+        <View style={styles.speciesOverlay}>
+          <View style={styles.speciesBox}>
+            <Text style={styles.speciesTitle}>
+              {fmzInfo ? `FMZ ${fmzInfo.zone} — ${fmzInfo.name}` : 'Species'}
+            </Text>
+            <Text style={styles.speciesSubtitle}>Species regulated in this zone</Text>
+            {fmzInfo?.rules.map((rule, i) => (
+              <View key={i} style={styles.speciesRow}>
+                <Text style={styles.speciesBullet}>🐟</Text>
+                <Text style={styles.speciesName}>{rule.species}</Text>
+              </View>
+            ))}
+            <TouchableOpacity
+              style={styles.speciesClose}
+              onPress={() => setSpeciesModalVisible(false)}
+            >
+              <Text style={styles.speciesCloseText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* ── Other note modal ── */}
       <Modal visible={otherModalVisible} transparent animationType="fade" onRequestClose={() => setOtherModalVisible(false)}>
         <View style={styles.otherOverlay}>
@@ -891,6 +932,75 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   otherConfirmText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  speciesButton: {
+    backgroundColor: '#0f2a1a',
+    borderWidth: 1,
+    borderColor: '#00c853',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  speciesButtonText: {
+    color: '#00e676',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  speciesOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  speciesBox: {
+    backgroundColor: '#122040',
+    borderRadius: 16,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#1a2d4a',
+  },
+  speciesTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  speciesSubtitle: {
+    color: '#8899aa',
+    fontSize: 12,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  speciesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a2d4a',
+  },
+  speciesBullet: {
+    fontSize: 16,
+    marginRight: 10,
+  },
+  speciesName: {
+    color: '#c0d0e0',
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+  },
+  speciesClose: {
+    backgroundColor: '#1e90ff',
+    borderRadius: 10,
+    padding: 12,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  speciesCloseText: {
     color: '#ffffff',
     fontSize: 15,
     fontWeight: '700',
