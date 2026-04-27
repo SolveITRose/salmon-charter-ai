@@ -488,14 +488,14 @@ export default function CaptainScreen() {
                   </Text>
                 </View>
               ))}
-              <TouchableOpacity onPress={() => Linking.openURL('https://www.ontario.ca/page/fishing')}>
-                <Text style={styles.regsDisclaimer}>Verify at ontario.ca/fishing before your trip →</Text>
+              <TouchableOpacity onPress={() => Linking.openURL('https://www.lioapplications.lrc.gov.on.ca/fishonline/Index.html?viewer=FishONLine.FishONLine&locale=en-CA&extent=-8875090.797843656%252C5523795.476836009%252C-8871718.013970578%252C5528821.2114457525')}>
+                <Text style={styles.regsDisclaimer}>Verify at Fish ON-Line before your trip →</Text>
               </TouchableOpacity>
             </>
           ) : (
-            <TouchableOpacity onPress={() => Linking.openURL('https://www.ontario.ca/page/fishing')}>
+            <TouchableOpacity onPress={() => Linking.openURL('https://www.lioapplications.lrc.gov.on.ca/fishonline/Index.html?viewer=FishONLine.FishONLine&locale=en-CA&extent=-8875090.797843656%252C5523795.476836009%252C-8871718.013970578%252C5528821.2114457525')}>
               <Text style={styles.regsDisclaimer}>
-                {`No inline data for FMZ ${fmzInfo.zone}. Check ontario.ca/fishing →`}
+                {`No inline data for FMZ ${fmzInfo.zone}. Check Fish ON-Line →`}
               </Text>
             </TouchableOpacity>
           )}
