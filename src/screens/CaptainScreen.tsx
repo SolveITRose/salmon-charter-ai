@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ScrollView,
   Modal,
+  Linking,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import uuid from 'react-native-uuid';
@@ -487,12 +488,16 @@ export default function CaptainScreen() {
                   </Text>
                 </View>
               ))}
-              <Text style={styles.regsDisclaimer}>Verify at ontario.ca/fishing before your trip.</Text>
+              <TouchableOpacity onPress={() => Linking.openURL('https://www.ontario.ca/page/fishing')}>
+                <Text style={styles.regsDisclaimer}>Verify at ontario.ca/fishing before your trip →</Text>
+              </TouchableOpacity>
             </>
           ) : (
-            <Text style={styles.regsDisclaimer}>
-              {`No inline data for FMZ ${fmzInfo.zone}. Check ontario.ca/fishing.`}
-            </Text>
+            <TouchableOpacity onPress={() => Linking.openURL('https://www.ontario.ca/page/fishing')}>
+              <Text style={styles.regsDisclaimer}>
+                {`No inline data for FMZ ${fmzInfo.zone}. Check ontario.ca/fishing →`}
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
       )}
@@ -822,11 +827,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
   },
   regsDisclaimer: {
-    color: '#4a6080',
+    color: '#1e90ff',
     fontSize: 10,
     paddingHorizontal: 14,
     paddingVertical: 8,
     fontStyle: 'italic',
+    textDecorationLine: 'underline',
   },
   otherOverlay: {
     flex: 1,
