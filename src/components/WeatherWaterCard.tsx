@@ -264,14 +264,16 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
             <Text style={styles.windHistoryCol}>Temp</Text>
             <Text style={styles.windHistoryCol}>Cloud</Text>
             <Text style={styles.windHistoryCol}>Precip</Text>
+            <Text style={styles.windHistoryCol}>hPa</Text>
           </View>
           {[...conditions.previous_wind].reverse().map((w, i) => (
             <View key={i} style={styles.windHistoryRow}>
               <Text style={[styles.windHistoryCol, styles.windHistoryColTime, styles.windHistoryVal]}>{w.time}</Text>
-              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.speed_mph.toFixed(2)} {w.direction_label}</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{Math.round(w.speed_mph)} {w.direction_deg}°</Text>
               <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.temp_c != null ? cToF(w.temp_c) : '—'}</Text>
               <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.cloud_cover_pct != null ? `${w.cloud_cover_pct}%` : '—'}</Text>
               <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.precipitation_mm != null && w.precipitation_mm > 0 ? `${Math.round(w.precipitation_mm)}mm` : '—'}</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.pressure_hpa != null ? `${w.pressure_hpa}` : '—'}</Text>
             </View>
           ))}
         </Section>
@@ -529,10 +531,10 @@ const styles = StyleSheet.create({
   windHistoryCol: {
     flex: 1,
     color: '#8899aa',
-    fontSize: 11,
+    fontSize: 10,
   },
   windHistoryColTime: {
-    flex: 1.2,
+    flex: 1.1,
   },
   windHistoryVal: {
     color: '#ffffff',
