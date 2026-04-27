@@ -429,9 +429,11 @@ export default function CaptainScreen() {
                 </Text>
               </View>
               <View style={styles.conditionsStat}>
-                <Text style={styles.conditionsStatLabel}>Water Temp</Text>
+                <Text style={styles.conditionsStatLabel}>Precipitation</Text>
                 <Text style={styles.conditionsStatValue}>
-                  {cToF(tripConditions.sst_buoy_c ?? tripConditions.sst_satellite_c)}
+                  {tripConditions.precipitation_mm !== null && tripConditions.precipitation_mm > 0
+                    ? `${tripConditions.precipitation_mm} mm`
+                    : 'None'}
                 </Text>
               </View>
               {waterBodyInfo?.waterLevel_m !== null && waterBodyInfo?.waterLevel_m !== undefined && (

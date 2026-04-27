@@ -263,7 +263,7 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
             <Text style={styles.windHistoryCol}>Wind</Text>
             <Text style={styles.windHistoryCol}>Temp</Text>
             <Text style={styles.windHistoryCol}>Cloud</Text>
-            <Text style={styles.windHistoryCol}>Rain</Text>
+            <Text style={styles.windHistoryCol}>Precip</Text>
           </View>
           {[...conditions.previous_wind].reverse().map((w, i) => (
             <View key={i} style={styles.windHistoryRow}>
@@ -334,7 +334,7 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
           value={
             conditions.chlorophyll_ug_l !== null
               ? `${conditions.chlorophyll_ug_l} µg/L · ${chlLabel(conditions.chlorophyll_ug_l)}`
-              : 'No data (cloud cover)'
+              : 'Satellite data unavailable'
           }
         />
         <Row

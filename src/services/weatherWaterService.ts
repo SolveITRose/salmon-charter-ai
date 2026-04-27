@@ -529,8 +529,13 @@ const LAKE_ERDDAP_PREFIX: Record<string, string> = {
 
 async function extractErddapValue(url: string, columnName: string): Promise<number | null> {
   try {
-    const res = await fetchWithTimeout(url, {}, 12000);
-    if (!res.ok) return null;
+    // ERDDAP uses square brackets in URLs — encode them for strict browser compliance
+    const encodedUrl = url.replace(/\[/g, '%5B').replace(/\]/g, '%5D');
+    const res = await fetchWithTimeout(encodedUrl, { mode: 'cors' }, 15000);
+    if (!res.ok) {
+      console.warn(`[GLERL] HTTP ${res.status} for ${columnName}`);
+      return null;
+    }
     const data = await res.json();
     const table = data?.table;
     if (!table) return null;
@@ -543,7 +548,8 @@ async function extractErddapValue(url: string, columnName: string): Promise<numb
       .filter((v): v is number => typeof v === 'number' && !isNaN(v));
     if (!values.length) return null;
     return r1(values.reduce((a, b) => a + b, 0) / values.length);
-  } catch {
+  } catch (err) {
+    console.warn(`[GLERL] fetch failed for ${columnName}:`, err);
     return null;
   }
 }
