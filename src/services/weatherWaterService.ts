@@ -219,7 +219,8 @@ async function fetchNDBC(stationId: string): Promise<Partial<TripConditions> | n
   }
 }
 
-// ── A2. OWM fallback (used when NDBC has no realtime data) ────────────────
+// ── A2. Open-Meteo current conditions (primary atmospheric source) ────────
+// Same model as fetchPreviousWind so current and history are internally consistent.
 
 function calcDewPointC(tempC: number, humidity: number): number | null {
   if (!tempC || !humidity) return null;
@@ -227,6 +228,53 @@ function calcDewPointC(tempC: number, humidity: number): number | null {
   const alpha = (a * tempC) / (b + tempC) + Math.log(humidity / 100);
   return r1(b * alpha / (a - alpha));
 }
+
+async function fetchOpenMeteoAtmospheric(
+  lat: number,
+  lng: number,
+): Promise<Partial<TripConditions>> {
+  try {
+    const res = await fetchWithTimeout(
+      `https://api.open-meteo.com/v1/forecast` +
+        `?latitude=${lat}&longitude=${lng}` +
+        `&current=temperature_2m,relative_humidity_2m,apparent_temperature,` +
+        `precipitation,cloud_cover,pressure_msl,` +
+        `wind_speed_10m,wind_direction_10m,wind_gusts_10m` +
+        `&wind_speed_unit=mph`,
+      {},
+      10000,
+    );
+    if (!res.ok) return {};
+    const data = await res.json();
+    const c = data.current ?? {};
+
+    const wdir: number | null = c.wind_direction_10m ?? null;
+    const tempC: number | null = c.temperature_2m ?? null;
+    const humidity: number | null = c.relative_humidity_2m ?? null;
+
+    return {
+      barometric_pressure_hpa: r1(c.pressure_msl ?? null),
+      pressure_tendency_hpa:   null,
+      pressure_trend:          null,
+      wind_speed_mph:          r1(c.wind_speed_10m ?? null),
+      wind_direction_deg:      wdir !== null ? Math.round(wdir) : null,
+      wind_direction_label:    wdir !== null ? degreesToCardinal(wdir) : null,
+      wind_gust_mph:           r1(c.wind_gusts_10m ?? null),
+      air_temp_c:              r1(tempC),
+      feels_like_c:            r1(c.apparent_temperature ?? null),
+      humidity_pct:            humidity !== null ? Math.round(humidity) : null,
+      dew_point_c:             tempC !== null && humidity !== null
+                                 ? calcDewPointC(tempC, humidity) : null,
+      cloud_cover_pct:         c.cloud_cover ?? null,
+      precipitation_mm:        r1(c.precipitation ?? null),
+    };
+  } catch (err) {
+    console.warn('[OpenMeteo] Current atmospheric fetch failed:', err);
+    return {};
+  }
+}
+
+// ── A3. OWM fallback (used only if Open-Meteo current also fails) ─────────
 
 async function fetchOWMAtmospheric(
   lat: number,
@@ -719,10 +767,10 @@ export async function fetchTripConditions(
   // and works anywhere in the world.
   const skipNDBC = nearestBuoyKm > 200;
 
-  const [ndbcRaw, owm, owmAtmo, solunar, glerl, prey, nws, uv, prevWind, astro, currents, pressureTrend] = await Promise.all([
+  const [ndbcRaw, owm, omAtmo, solunar, glerl, prey, nws, uv, prevWind, astro, currents, pressureTrend] = await Promise.all([
     skipNDBC ? Promise.resolve(null) : fetchNDBC(stationId),
     fetchOWM(lat, lng),
-    fetchOWMAtmospheric(lat, lng),
+    fetchOpenMeteoAtmospheric(lat, lng),   // primary: same model as history
     fetchSolunar(lat, lng, date),
     fetchGLERL(lat, lng),
     fetchChlorophyllTurbidity(lat, lng, lakeId),
@@ -734,40 +782,38 @@ export async function fetchTripConditions(
     fetchPressureTrend(lat, lng),
   ]);
 
-  // Fall back to OWM atmospheric if NDBC station has no realtime data (e.g. Canadian buoys)
-  const usingFallback = ndbcRaw === null;
-  const ndbc = ndbcRaw ?? owmAtmo;
-
+  // Atmospheric data: Open-Meteo (same model as history) is primary.
+  // NDBC supplements with marine-specific data (waves, SST) when available.
   return {
     fetched_at:               new Date().toISOString(),
     lake_id:                  lakeId,
     ndbc_station_id:          stationId,
     query_lat:                lat,
     query_lng:                lng,
-    barometric_pressure_hpa:  ndbc.barometric_pressure_hpa  ?? null,
-    pressure_tendency_hpa:    ndbc.pressure_tendency_hpa    ?? null,
-    pressure_trend:           ndbc.pressure_trend           ?? pressureTrend ?? null,
-    wind_speed_mph:           ndbc.wind_speed_mph           ?? null,
-    wind_direction_deg:       ndbc.wind_direction_deg       ?? null,
-    wind_direction_label:     ndbc.wind_direction_label     ?? null,
-    wind_gust_mph:            ndbc.wind_gust_mph            ?? null,
-    air_temp_c:               ndbc.air_temp_c               ?? null,
-    cloud_cover_pct:          owm.cloud_cover_pct           ?? owmAtmo.cloud_cover_pct ?? null,
-    precipitation_type:       owm.precipitation_type        ?? null,
-    precipitation_mm:         owm.precipitation_mm          ?? owmAtmo.precipitation_mm ?? null,
-    visibility_km:            ndbc.visibility_km            ?? null,
-    wave_height_ft:           ndbc.wave_height_ft           ?? null,
-    wave_period_dominant_s:   ndbc.wave_period_dominant_s   ?? null,
-    wave_direction_deg:       ndbc.wave_direction_deg       ?? null,
-    current_speed_knots:      currents.current_speed_knots  ?? null,
-    current_direction_deg:    currents.current_direction_deg ?? null,
+    barometric_pressure_hpa:  omAtmo.barometric_pressure_hpa  ?? ndbcRaw?.barometric_pressure_hpa ?? null,
+    pressure_tendency_hpa:    ndbcRaw?.pressure_tendency_hpa  ?? null,
+    pressure_trend:           pressureTrend                   ?? ndbcRaw?.pressure_trend ?? null,
+    wind_speed_mph:           omAtmo.wind_speed_mph           ?? ndbcRaw?.wind_speed_mph ?? null,
+    wind_direction_deg:       omAtmo.wind_direction_deg       ?? ndbcRaw?.wind_direction_deg ?? null,
+    wind_direction_label:     omAtmo.wind_direction_label     ?? ndbcRaw?.wind_direction_label ?? null,
+    wind_gust_mph:            omAtmo.wind_gust_mph            ?? ndbcRaw?.wind_gust_mph ?? null,
+    air_temp_c:               omAtmo.air_temp_c               ?? ndbcRaw?.air_temp_c ?? null,
+    cloud_cover_pct:          omAtmo.cloud_cover_pct          ?? owm.cloud_cover_pct ?? null,
+    precipitation_type:       owm.precipitation_type          ?? null,
+    precipitation_mm:         omAtmo.precipitation_mm         ?? owm.precipitation_mm ?? null,
+    visibility_km:            ndbcRaw?.visibility_km          ?? null,
+    wave_height_ft:           ndbcRaw?.wave_height_ft         ?? null,
+    wave_period_dominant_s:   ndbcRaw?.wave_period_dominant_s ?? null,
+    wave_direction_deg:       ndbcRaw?.wave_direction_deg     ?? null,
+    current_speed_knots:      currents.current_speed_knots    ?? null,
+    current_direction_deg:    currents.current_direction_deg  ?? null,
     current_direction_label:  currents.current_direction_label ?? null,
-    sst_buoy_c:               ndbc.sst_buoy_c               ?? null,
-    sst_satellite_c:          glerl.sst_satellite_c         ?? null,
-    chlorophyll_ug_l:         prey.chlorophyll_ug_l         ?? null,
-    turbidity_mg_l:           prey.turbidity_mg_l           ?? null,
-    moon_phase_value:         owm.moon_phase_value          ?? calcMoonPhase(new Date()),
-    moon_phase_label:         owm.moon_phase_label          ?? moonPhaseLabelFrom(owm.moon_phase_value ?? calcMoonPhase(new Date())),
+    sst_buoy_c:               ndbcRaw?.sst_buoy_c             ?? null,
+    sst_satellite_c:          glerl.sst_satellite_c           ?? null,
+    chlorophyll_ug_l:         prey.chlorophyll_ug_l           ?? null,
+    turbidity_mg_l:           prey.turbidity_mg_l             ?? null,
+    moon_phase_value:         owm.moon_phase_value            ?? calcMoonPhase(new Date()),
+    moon_phase_label:         owm.moon_phase_label            ?? moonPhaseLabelFrom(owm.moon_phase_value ?? calcMoonPhase(new Date())),
     moonrise_time:            astro.moonrise ?? null,
     moonset_time:             astro.moonset  ?? null,
     sunrise_time:             astro.sunrise  ?? null,
@@ -781,16 +827,16 @@ export async function fetchTripConditions(
     solunar_minor_2_start:    solunar.solunar_minor_2_start ?? null,
     solunar_minor_2_stop:     solunar.solunar_minor_2_stop  ?? null,
     solunar_day_rating:       solunar.solunar_day_rating    ?? null,
-    humidity_pct:             ndbc.humidity_pct             ?? null,
-    feels_like_c:             ndbc.feels_like_c             ?? null,
-    dew_point_c:              ndbc.dew_point_c              ?? null,
-    conditions_text:          ndbc.conditions_text          ?? owm.precipitation_type ?? null,
+    humidity_pct:             omAtmo.humidity_pct           ?? null,
+    feels_like_c:             omAtmo.feels_like_c           ?? null,
+    dew_point_c:              omAtmo.dew_point_c            ?? null,
+    conditions_text:          owm.precipitation_type        ?? null,
     uv_index:                 uv.uv_index,
     uv_index_label:           uv.uv_index_label,
     previous_wind:            prevWind ?? null,
     marine_warning_active:    nws.marine_warning_active     ?? false,
     marine_warning_text:      nws.marine_warning_text       ?? null,
-    atmospheric_source:       usingFallback ? 'owm' : 'ndbc',
+    atmospheric_source:       'ndbc',  // field kept for schema compat; now always Open-Meteo primary
   };
 }
 
