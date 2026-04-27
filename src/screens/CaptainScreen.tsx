@@ -21,6 +21,7 @@ import WeatherWaterCard from '../components/WeatherWaterCard';
 import FishFinderModal from '../components/FishFinderModal';
 import { fetchTripConditions, fetchPreyData, TripConditions } from '../services/weatherWaterService';
 import { saveTripConditions } from '../storage/localDB';
+import { fetchWaterBodyInfo, WaterBodyInfo } from '../services/waterBodyService';
 
 function cToF(c: number | null): string {
   if (c === null) return '—';
@@ -40,6 +41,7 @@ export default function CaptainScreen() {
   const [tripConditions, setTripConditions] = useState<TripConditions | null>(null);
   const [tripConditionsLoading, setTripConditionsLoading] = useState(false);
   const [conditionsExpanded, setConditionsExpanded] = useState(false);
+  const [waterBodyInfo, setWaterBodyInfo] = useState<WaterBodyInfo | null>(null);
   const [fishOnLoading, setFishOnLoading] = useState(false);
   const [fishOnMessage, setFishOnMessage] = useState<string | null>(null);
   const [fishFinderEvent, setFishFinderEvent] = useState<CatchEvent | null>(null);
@@ -72,8 +74,12 @@ export default function CaptainScreen() {
       const lat = gps?.lat || 44.88702;
       const lng = gps?.lng || -80.066101;
       const date = new Date().toISOString().split('T')[0];
-      const conditions = await fetchTripConditions(lat, lng, date);
+      const [conditions, waterBody] = await Promise.all([
+        fetchTripConditions(lat, lng, date),
+        fetchWaterBodyInfo(lat, lng),
+      ]);
       setTripConditions(conditions);
+      setWaterBodyInfo(waterBody);
       await saveTripConditions(new Date().toISOString(), conditions);
     } catch (err) {
       console.warn('[Captain] loadTripConditions failed:', err);
@@ -384,7 +390,12 @@ export default function CaptainScreen() {
       >
         <View style={styles.conditionsStripLeft}>
           <View style={styles.conditionsStripHeader}>
-            <Text style={styles.conditionsStripLabel}>Conditions</Text>
+            <Text style={styles.conditionsStripLabel}>
+              {'Conditions'}
+              {waterBodyInfo?.name ? (
+                <Text style={styles.conditionsWaterName}>{`  ·  ${waterBodyInfo.name}`}</Text>
+              ) : null}
+            </Text>
             <Text style={styles.conditionsChevron}>{conditionsExpanded ? '▲' : '▼'}</Text>
           </View>
           {tripConditionsLoading ? (
@@ -419,6 +430,18 @@ export default function CaptainScreen() {
                   {cToF(tripConditions.sst_buoy_c ?? tripConditions.sst_satellite_c)}
                 </Text>
               </View>
+              {waterBodyInfo?.waterLevel_m !== null && waterBodyInfo?.waterLevel_m !== undefined && (
+                <View style={styles.conditionsStat}>
+                  <Text style={styles.conditionsStatLabel}>River Level</Text>
+                  <Text style={styles.conditionsStatValue}>{`${waterBodyInfo.waterLevel_m} m`}</Text>
+                </View>
+              )}
+              {waterBodyInfo?.flow_cms !== null && waterBodyInfo?.flow_cms !== undefined && (
+                <View style={styles.conditionsStat}>
+                  <Text style={styles.conditionsStatLabel}>Flow Rate</Text>
+                  <Text style={styles.conditionsStatValue}>{`${waterBodyInfo.flow_cms} m³/s`}</Text>
+                </View>
+              )}
             </View>
           ) : (
             <Text style={styles.conditionsStripData}>Tap to view full conditions</Text>
@@ -591,6 +614,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.6,
+    flex: 1,
+  },
+  conditionsWaterName: {
+    color: '#c0d0e0',
+    fontWeight: '500',
+    textTransform: 'none',
+    letterSpacing: 0,
   },
   conditionsStripData: {
     color: '#8899aa',
