@@ -16,18 +16,23 @@ import { getCurrentPosition } from '../services/gpsService';
 import { fetchWeatherData, fetchWindHistory, fetchPressureHistory } from '../services/weatherService';
 import { computeHydroScore } from '../agents/hydrodynamicAgent';
 import { insertEvent, updateEvent, insertMark, updateMark } from '../storage/localDB';
-import { formatEventCode } from '../utils/formatters';
+import { formatEventCode, celsiusToFahrenheit } from '../utils/formatters';
 import WeatherWaterCard from '../components/WeatherWaterCard';
 import FishFinderModal from '../components/FishFinderModal';
 import { fetchTripConditions, fetchPreyData, TripConditions } from '../services/weatherWaterService';
 import { saveTripConditions } from '../storage/localDB';
+
+function cToF(c: number | null): string {
+  if (c === null) return '—';
+  return `${Math.round(celsiusToFahrenheit(c))}°F`;
+}
 
 const COUNTER_KEY = 'event_counter';
 
 export default function CaptainScreen() {
   const [tripConditions, setTripConditions] = useState<TripConditions | null>(null);
   const [tripConditionsLoading, setTripConditionsLoading] = useState(false);
-  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
+  const [conditionsExpanded, setConditionsExpanded] = useState(false);
   const [fishOnLoading, setFishOnLoading] = useState(false);
   const [fishOnMessage, setFishOnMessage] = useState<string | null>(null);
   const [fishFinderEvent, setFishFinderEvent] = useState<CatchEvent | null>(null);
@@ -302,12 +307,17 @@ export default function CaptainScreen() {
           onSkip={handleMarkFinderSkip}
         />
       )}
-      <WeatherWaterCard
-        conditions={tripConditions}
-        loading={tripConditionsLoading}
-        onRetry={loadTripConditions}
-      />
 
+      {/* ── Marine Warning — always visible when active ── */}
+      {tripConditions?.marine_warning_active && (
+        <View style={styles.marineAlert}>
+          <Text style={styles.marineAlertText}>
+            ⚠  {tripConditions.marine_warning_text ?? 'Marine Warning Active'}
+          </Text>
+        </View>
+      )}
+
+      {/* ── Fish On! ── */}
       <TouchableOpacity
         style={[styles.fishOnButton, fishOnLoading && styles.fishOnButtonDisabled]}
         onPress={handleFishOn}
@@ -332,11 +342,11 @@ export default function CaptainScreen() {
         <Text style={styles.markSectionTitle}>Mark Location</Text>
         <View style={styles.markGrid}>
           {([
-            { type: 'bait',      icon: '🦐', label: 'Bait'         },
-            { type: 'fish',      icon: '🐟', label: 'Fish'         },
-            { type: 'fish_bait', icon: '🎯', label: 'Fish + Bait'  },
-            { type: 'structure', icon: '⛰️', label: 'Structure'    },
-            { type: 'other',     icon: '📍', label: 'Other'        },
+            { type: 'bait',      icon: '🦐', label: 'Bait'        },
+            { type: 'fish',      icon: '🐟', label: 'Fish'        },
+            { type: 'fish_bait', icon: '🎯', label: 'Fish + Bait' },
+            { type: 'structure', icon: '⛰️', label: 'Structure'   },
+            { type: 'other',     icon: '📍', label: 'Other'       },
           ] as { type: MarkType; icon: string; label: string }[]).map(({ type, icon, label }) => (
             <TouchableOpacity
               key={type}
@@ -356,6 +366,35 @@ export default function CaptainScreen() {
         <TouchableOpacity style={styles.markBanner} onPress={() => setMarkMessage(null)} activeOpacity={0.8}>
           <Text style={styles.markBannerText}>📍 {markMessage}</Text>
         </TouchableOpacity>
+      )}
+
+      {/* ── Conditions strip — collapsed by default ── */}
+      <TouchableOpacity
+        style={styles.conditionsStrip}
+        onPress={() => setConditionsExpanded((v) => !v)}
+        activeOpacity={0.75}
+      >
+        <View style={styles.conditionsStripLeft}>
+          <Text style={styles.conditionsStripLabel}>Conditions</Text>
+          {tripConditionsLoading ? (
+            <Text style={styles.conditionsStripData}>Loading...</Text>
+          ) : tripConditions ? (
+            <Text style={styles.conditionsStripData} numberOfLines={1}>
+              {`💨 ${tripConditions.wind_speed_mph !== null ? Math.round(tripConditions.wind_speed_mph * 1.60934) + ' km/h' : '—'} ${tripConditions.wind_direction_label ?? ''}  ·  🌡 ${cToF(tripConditions.sst_buoy_c ?? tripConditions.sst_satellite_c)}  ·  ${tripConditions.conditions_text ?? ''}`}
+            </Text>
+          ) : (
+            <Text style={styles.conditionsStripData}>Tap to load</Text>
+          )}
+        </View>
+        <Text style={styles.conditionsChevron}>{conditionsExpanded ? '▲' : '▼'}</Text>
+      </TouchableOpacity>
+
+      {conditionsExpanded && (
+        <WeatherWaterCard
+          conditions={tripConditions}
+          loading={tripConditionsLoading}
+          onRetry={loadTripConditions}
+        />
       )}
 
       {/* ── Other note modal ── */}
@@ -384,28 +423,6 @@ export default function CaptainScreen() {
           </View>
         </View>
       </Modal>
-
-      <TouchableOpacity style={styles.infoBox} onPress={() => setHowItWorksOpen((v) => !v)} activeOpacity={0.7}>
-        <View style={styles.infoTitleRow}>
-          <Text style={styles.infoTitle}>How it works</Text>
-          <Text style={styles.infoChevron}>{howItWorksOpen ? '▲' : '▼'}</Text>
-        </View>
-        {howItWorksOpen && (
-          <Text style={styles.infoText}>
-            1. Tap "Fish On!" the moment a fish strikes{'\n'}
-            2. GPS, weather, and HydroScore captured instantly{'\n'}
-            3. Share the event code with your mate{'\n'}
-            4. Mate joins the event, adds photo and rig setup{'\n'}
-            5. AI identifies species from the mate's photo{'\n\n'}
-            Mark Types:{'\n'}
-            🦐 Bait — baitfish activity on sonar or sighted{'\n'}
-            🐟 Fish — fish at this position, no bait{'\n'}
-            🎯 Fish + Bait — fish and bait on the same mark{'\n'}
-            ⛰️ Structure — notable bottom feature (ledge, reef, drop-off){'\n'}
-            📍 Other — custom note, e.g. strong current, colour change
-          </Text>
-        )}
-      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -495,34 +512,52 @@ const styles = StyleSheet.create({
     fontSize: 12,
     paddingVertical: 3,
   },
-  infoBox: {
-    backgroundColor: '#122040',
-    marginHorizontal: 24,
-    borderRadius: 12,
-    padding: 16,
+  marineAlert: {
+    backgroundColor: '#7f1d1d',
+    marginHorizontal: 0,
+    marginBottom: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#1a2d4a',
-    marginTop: 8,
+    borderColor: '#ff4444',
   },
-  infoTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  infoTitle: {
-    color: '#1e90ff',
-    fontSize: 15,
+  marineAlertText: {
+    color: '#fca5a5',
+    fontSize: 13,
     fontWeight: '600',
   },
-  infoChevron: {
+  conditionsStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#122040',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1a2d4a',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  conditionsStripLeft: {
+    flex: 1,
+    marginRight: 8,
+  },
+  conditionsStripLabel: {
     color: '#1e90ff',
     fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 3,
   },
-  infoText: {
-    color: '#8899aa',
-    fontSize: 14,
-    lineHeight: 22,
-    marginTop: 10,
+  conditionsStripData: {
+    color: '#c0d0e0',
+    fontSize: 13,
+  },
+  conditionsChevron: {
+    color: '#1e90ff',
+    fontSize: 12,
   },
   markSection: {
     marginHorizontal: 24,
