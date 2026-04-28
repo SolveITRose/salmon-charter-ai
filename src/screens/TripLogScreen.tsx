@@ -403,8 +403,8 @@ export default function TripLogScreen() {
                     {selectedEvent.fishFinder.speedOverGround !== undefined && (
                       <SetupRow label="SOG" value={`${selectedEvent.fishFinder.speedOverGround.toFixed(2)} mph`} />
                     )}
-                    {selectedEvent.fishFinder.heading !== undefined && (
-                      <SetupRow label="Heading" value={`${Math.round(selectedEvent.fishFinder.heading)}°`} />
+                    {selectedEvent.fishFinder.timeOfDay !== undefined && (
+                      <SetupRow label="Time" value={selectedEvent.fishFinder.timeOfDay} />
                     )}
                     {selectedEvent.fishFinder.baitOnScreen !== undefined && (
                       <SetupRow label="Bait on Screen" value={selectedEvent.fishFinder.baitOnScreen ? 'Yes' : 'No'} />

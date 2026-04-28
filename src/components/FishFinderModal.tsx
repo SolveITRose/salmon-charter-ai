@@ -42,8 +42,8 @@ export default function FishFinderModal({ visible, event, onSave, onSkip }: Fish
     event.gps.speed ? String(Math.round(event.gps.speed * KNOTS_TO_MPH * 10) / 10) : ''
   );
   const [courseOverGround, setCourseOverGround] = useState('');
-  const [heading, setHeading] = useState(
-    event.gps.heading ? String(Math.round(event.gps.heading)) : ''
+  const [timeOfDay] = useState(
+    new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
   );
   const [baitOnScreen, setBaitOnScreen] = useState<boolean | null>(null);
 
@@ -52,7 +52,6 @@ export default function FishFinderModal({ visible, event, onSave, onSkip }: Fish
     if (parsed.depth !== undefined) setDepth(String(parsed.depth));
     if (parsed.speedOverGround !== undefined) setSpeedOverGround(String(parsed.speedOverGround));
     if (parsed.courseOverGround !== undefined) setCourseOverGround(String(parsed.courseOverGround));
-    if (parsed.heading !== undefined) setHeading(String(parsed.heading));
     if (parsed.baitOnScreen !== undefined) setBaitOnScreen(parsed.baitOnScreen);
   };
 
@@ -113,7 +112,7 @@ export default function FishFinderModal({ visible, event, onSave, onSkip }: Fish
       depth: parseFloat(depth) || undefined,
       speedOverGround: parseFloat(speedOverGround) || undefined,
       courseOverGround: parseFloat(courseOverGround) || undefined,
-      heading: parseFloat(heading) || undefined,
+      timeOfDay,
       baitOnScreen: baitOnScreen ?? undefined,
     };
     onSave(data);
@@ -204,9 +203,10 @@ export default function FishFinderModal({ visible, event, onSave, onSkip }: Fish
 
                 <View style={styles.row}>
                   <View style={styles.halfField}>
-                    <Text style={styles.label}>Heading (°)</Text>
-                    <TextInput style={styles.input} value={heading} onChangeText={setHeading}
-                      placeholder="e.g. 265" placeholderTextColor="#4a5f7a" keyboardType="decimal-pad" />
+                    <Text style={styles.label}>Time of Day</Text>
+                    <View style={[styles.input, { justifyContent: 'center' }]}>
+                      <Text style={{ color: '#ffffff', fontSize: 15 }}>{timeOfDay}</Text>
+                    </View>
                   </View>
                   <View style={styles.halfField}>
                     <Text style={styles.label}>Bait On Screen</Text>

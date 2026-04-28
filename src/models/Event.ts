@@ -23,7 +23,7 @@ export interface FishFinderData {
   depth?: number;            // ft
   speedOverGround?: number;  // mph
   courseOverGround?: number; // degrees
-  heading?: number;          // degrees
+  timeOfDay?: string;        // e.g. "2:34 PM"
   baitOnScreen?: boolean;
 }
 
