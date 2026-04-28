@@ -459,12 +459,6 @@ export default function CaptainScreen() {
                     ? `${Math.round(tripConditions.wind_direction_deg)}° ${fullCardinal(tripConditions.wind_direction_deg)}`
                     : '—'}
                 </Text>
-                <Text style={[styles.conditionsStatLabel, { marginTop: 8 }]}>Wind Speed</Text>
-                <Text style={styles.conditionsStatValue}>
-                  {tripConditions.wind_speed_mph !== null
-                    ? `${Math.round(tripConditions.wind_speed_mph * 1.60934)} km/h`
-                    : '—'}
-                </Text>
               </View>
               <View style={styles.conditionsStat}>
                 <Text style={styles.conditionsStatLabel}>Cloud Cover</Text>
@@ -473,17 +467,25 @@ export default function CaptainScreen() {
                 </Text>
               </View>
               <View style={styles.conditionsStat}>
-                <Text style={styles.conditionsStatLabel}>Precipitation</Text>
+                <Text style={styles.conditionsStatLabel}>Wind Speed</Text>
                 <Text style={styles.conditionsStatValue}>
-                  {tripConditions.precipitation_mm !== null && tripConditions.precipitation_mm > 0
-                    ? `${tripConditions.precipitation_mm} mm`
-                    : 'None'}
+                  {tripConditions.wind_speed_mph !== null
+                    ? `${Math.round(tripConditions.wind_speed_mph * 1.60934)} km/h`
+                    : '—'}
                 </Text>
               </View>
               <View style={styles.conditionsStat}>
                 <Text style={styles.conditionsStatLabel}>Air Temp</Text>
                 <Text style={styles.conditionsStatValue}>
                   {tripConditions.air_temp_c !== null ? cToF(tripConditions.air_temp_c) : '—'}
+                </Text>
+              </View>
+              <View style={styles.conditionsStat}>
+                <Text style={styles.conditionsStatLabel}>Precipitation</Text>
+                <Text style={styles.conditionsStatValue}>
+                  {tripConditions.precipitation_mm !== null && tripConditions.precipitation_mm > 0
+                    ? `${tripConditions.precipitation_mm} mm`
+                    : 'None'}
                 </Text>
               </View>
               {waterBodyInfo?.waterLevel_m !== null && waterBodyInfo?.waterLevel_m !== undefined && (
