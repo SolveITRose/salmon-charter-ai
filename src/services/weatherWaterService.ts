@@ -345,15 +345,12 @@ async function fetchPreviousWind(
 ): Promise<TripConditions['previous_wind']> {
   try {
     const now = new Date();
-    const past = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const startDate = past.toISOString().split('T')[0];
-    const endDate = now.toISOString().split('T')[0];
     const url =
       `https://api.open-meteo.com/v1/forecast` +
       `?latitude=${lat}&longitude=${lng}` +
       `&hourly=wind_speed_10m,wind_direction_10m,temperature_2m,cloud_cover,precipitation,pressure_msl` +
       `&wind_speed_unit=mph` +
-      `&start_date=${startDate}&end_date=${endDate}`;
+      `&past_days=1&forecast_days=1`;
     const res = await fetchWithTimeout(url, {}, 10000);
     if (!res.ok) return null;
     const data = await res.json();
