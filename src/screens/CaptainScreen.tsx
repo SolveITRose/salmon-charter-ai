@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import uuid from 'react-native-uuid';
 
 import { CatchEvent, FishFinderData, GpsData, GpsMark, MarkType, WeatherData } from '../models/Event';
-import { getCurrentPosition } from '../services/gpsService';
+import { getCurrentPosition, watchPosition } from '../services/gpsService';
 import { fetchWeatherData, fetchWindHistory, fetchPressureHistory } from '../services/weatherService';
 import { computeHydroScore } from '../agents/hydrodynamicAgent';
 import { insertEvent, updateEvent, insertMark, updateMark, getPendingBiteEvents } from '../storage/localDB';
@@ -77,6 +77,7 @@ export default function CaptainScreen() {
   const [otherModalVisible, setOtherModalVisible] = useState(false);
   const [otherNote, setOtherNote] = useState('');
   const [pendingMarkForScan, setPendingMarkForScan] = useState<GpsMark | null>(null);
+  const lastGpsRef = useRef<GpsData | null>(null);
 
   const loadPendingBites = useCallback(async () => {
     const bites = await getPendingBiteEvents();
@@ -86,6 +87,13 @@ export default function CaptainScreen() {
   useEffect(() => {
     loadTripConditions();
     loadPendingBites();
+  }, []);
+
+  useEffect(() => {
+    let cleanup: (() => void) | null = null;
+    watchPosition((data) => { lastGpsRef.current = data; })
+      .then((fn) => { cleanup = fn; });
+    return () => { cleanup?.(); };
   }, []);
 
   useEffect(() => {
@@ -158,7 +166,7 @@ export default function CaptainScreen() {
     setFishOnLoading(true);
     try {
       const [gps, counter] = await Promise.all([
-        getCurrentPosition(),
+        lastGpsRef.current ? Promise.resolve(lastGpsRef.current) : getCurrentPosition(),
         getNextCounter(),
       ]);
       const gpsData = gps || defaultGps();
@@ -251,7 +259,7 @@ export default function CaptainScreen() {
   const handleMark = useCallback(async (type: MarkType, notes?: string) => {
     setMarkLoading(type);
     try {
-      const gps = await getCurrentPosition();
+      const gps = lastGpsRef.current ?? await getCurrentPosition();
       const gpsData = gps || defaultGps();
       const catchLat = gpsData.lat || 44.88702;
       const catchLng = gpsData.lng || -80.066101;
