@@ -13,13 +13,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Login to Azure
+        uses: azure/login@v2
         with:
-          python-version: '3.11'
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Zip Server directory
+        run: cd Server && zip -r ../backend.zip .
 
       - name: Deploy to Azure App Service
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: salmon-charter-backend
-          publish-profile: ${{ secrets.AZURE_BACKEND_PUBLISH_PROFILE }}
-          package: Server
+        run: |
+          az webapp deploy \
+            --resource-group salmon-charter-rg \
+            --name salmon-charter-backend \
+            --src-path backend.zip \
+            --type zip
