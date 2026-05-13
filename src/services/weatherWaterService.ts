@@ -1,5 +1,4 @@
-// No more OWM_KEY here! Security risk fixed.
-const PROXY_URL = "http://192.168.2.87:8000/conditions"; 
+const PROXY_URL = process.env.EXPO_PUBLIC_PROXY_URL ?? "http://192.168.2.87:8000/conditions";
 
 export interface TripConditions {
   // ... Keep your existing interface here ...

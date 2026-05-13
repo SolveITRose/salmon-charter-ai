@@ -25,6 +25,7 @@ jobs:
           EXPO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.EXPO_PUBLIC_ANTHROPIC_API_KEY }}
           EXPO_PUBLIC_OWM_API_KEY: ${{ secrets.EXPO_PUBLIC_OWM_API_KEY }}
           EXPO_PUBLIC_SIGNALK_PORT: ${{ secrets.EXPO_PUBLIC_SIGNALK_PORT }}
+          EXPO_PUBLIC_PROXY_URL: ${{ secrets.EXPO_PUBLIC_PROXY_URL }}
 
       - name: Deploy to Azure Static Web Apps
         uses: Azure/static-web-apps-deploy@v1
