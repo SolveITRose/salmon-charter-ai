@@ -141,7 +141,7 @@ async def fetch_open_meteo(client, lat, lng):
             f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,"
             f"cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code"
             f"&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,precipitation,cloud_cover,pressure_msl"
-            f"&wind_speed_unit=mph&forecast_days=1&past_days=1"
+            f"&wind_speed_unit=mph&forecast_days=1&past_days=1&timezone=auto"
         )
         resp = await client.get(url, timeout=10.0)
         return resp.json()
@@ -337,7 +337,12 @@ async def fetch_nws_alerts(client, lat, lng):
     except:
         return {"marine_warning_active": False, "marine_warning_text": None}
 
-def build_previous_wind(om_data, now):
+def local_now_str(om_data, now_utc):
+    utc_offset = om_data.get("utc_offset_seconds", 0)
+    local_now = now_utc + timedelta(seconds=utc_offset)
+    return local_now.strftime("%Y-%m-%dT%H:00")
+
+def build_previous_wind(om_data, now_utc):
     try:
         hourly = om_data.get("hourly", {})
         times = hourly.get("time", [])
@@ -348,14 +353,10 @@ def build_previous_wind(om_data, now):
         precip = hourly.get("precipitation", [])
         pressures = hourly.get("pressure_msl", [])
 
-        now_ms = now.replace(minute=0, second=0, microsecond=0).timestamp()
+        now_local = local_now_str(om_data, now_utc)
         result = []
         for i, t in enumerate(times):
-            try:
-                t_ms = datetime.fromisoformat(t).timestamp()
-            except:
-                continue
-            if t_ms <= now_ms and i < len(speeds):
+            if t <= now_local and i < len(speeds):
                 result.append({
                     "time": format_hour_12(t),
                     "speed_mph": r1(speeds[i]) if i < len(speeds) else None,
@@ -370,14 +371,13 @@ def build_previous_wind(om_data, now):
     except:
         return []
 
-def calc_pressure_trend(om_data, now):
+def calc_pressure_trend(om_data, now_utc):
     try:
         hourly = om_data.get("hourly", {})
         times = hourly.get("time", [])
         pressures = hourly.get("pressure_msl", [])
-        now_ms = now.replace(minute=0, second=0, microsecond=0).timestamp()
-        past = [(datetime.fromisoformat(t).timestamp(), p) for t, p in zip(times, pressures) if p is not None]
-        past = [(ts, p) for ts, p in past if ts <= now_ms]
+        now_local = local_now_str(om_data, now_utc)
+        past = [(t, p) for t, p in zip(times, pressures) if p is not None and t <= now_local]
         if len(past) < 3: return None, None
         recent = past[-1][1]
         older = past[-3][1]
