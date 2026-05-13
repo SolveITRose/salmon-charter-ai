@@ -295,13 +295,13 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
                 ) : buoyData[buoy.id] ? (
                   <>
                     <Row label="Wind Direction" value={buoyData[buoy.id].wind_direction_deg !== null ? `${buoyData[buoy.id].wind_direction_deg}° (${buoyData[buoy.id].wind_direction_label ?? '—'})` : '—'} />
-                    <Row label="Wind Speed"     value={buoyData[buoy.id].wind_speed_ms !== null ? `${buoyData[buoy.id].wind_speed_ms} m/s` : '—'} />
-                    <Row label="Wind Gust"      value={buoyData[buoy.id].wind_gust_ms !== null ? `${buoyData[buoy.id].wind_gust_ms} m/s` : '—'} />
+                    <Row label="Wind Speed"     value={buoyData[buoy.id].wind_speed_ms !== null ? `${Math.round(buoyData[buoy.id].wind_speed_ms! * 3.6)} km/h` : '—'} />
+                    <Row label="Wind Gust"      value={buoyData[buoy.id].wind_gust_ms !== null ? `${Math.round(buoyData[buoy.id].wind_gust_ms! * 3.6)} km/h` : '—'} />
                     <Row label="Wave Height"    value={buoyData[buoy.id].wave_height_m !== null ? `${buoyData[buoy.id].wave_height_m} m` : '—'} />
                     <Row label="Wave Period"    value={buoyData[buoy.id].wave_period_s !== null ? `${buoyData[buoy.id].wave_period_s} s` : '—'} />
                     <Row label="Pressure"       value={buoyData[buoy.id].pressure_hpa !== null ? `${buoyData[buoy.id].pressure_hpa} hPa${buoyData[buoy.id].pressure_tendency_hpa !== null ? (buoyData[buoy.id].pressure_tendency_hpa! > 0 ? ' ↑' : ' ↓') : ''}` : '—'} />
-                    <Row label="Air Temp"       value={buoyData[buoy.id].air_temp_c !== null ? `${buoyData[buoy.id].air_temp_c}°C` : '—'} />
-                    <Row label="Water Temp"     value={buoyData[buoy.id].water_temp_c !== null ? `${buoyData[buoy.id].water_temp_c}°C` : '—'} />
+                    <Row label="Air Temp"       value={buoyData[buoy.id].air_temp_c !== null ? `${Math.round(buoyData[buoy.id].air_temp_c! * 9 / 5 + 32)}°F` : '—'} />
+                    <Row label="Water Temp"     value={buoyData[buoy.id].water_temp_c !== null ? `${Math.round(buoyData[buoy.id].water_temp_c! * 9 / 5 + 32)}°F` : '—'} />
                   </>
                 ) : null}
               </View>
