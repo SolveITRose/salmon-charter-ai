@@ -234,18 +234,28 @@ async function fetchOpenMeteoAtmospheric(
   lng: number,
 ): Promise<Partial<TripConditions>> {
   try {
-    const res = await fetchWithTimeout(
-      `https://api.open-meteo.com/v1/forecast` +
-        `?latitude=${lat}&longitude=${lng}` +
-        `&current=temperature_2m,relative_humidity_2m,apparent_temperature,` +
-        `precipitation,cloud_cover,pressure_msl,` +
-        `wind_speed_10m,wind_direction_10m,wind_gusts_10m` +
-        `&wind_speed_unit=mph`,
-      {},
-      10000,
-    );
-    if (!res.ok) return {};
-    const data = await res.json();
+    const [atmosRes, marineRes] = await Promise.all([
+      fetchWithTimeout(
+        `https://api.open-meteo.com/v1/forecast` +
+          `?latitude=${lat}&longitude=${lng}` +
+          `&current=temperature_2m,relative_humidity_2m,apparent_temperature,` +
+          `precipitation,cloud_cover,pressure_msl,` +
+          `wind_speed_10m,wind_direction_10m,wind_gusts_10m` +
+          `&wind_speed_unit=mph`,
+        {},
+        10000,
+      ),
+      fetchWithTimeout(
+        `https://marine-api.open-meteo.com/v1/marine` +
+          `?latitude=${lat}&longitude=${lng}` +
+          `&current=sea_surface_temperature,wave_height,wave_period,wave_direction`,
+        {},
+        10000,
+      ),
+    ]);
+
+    const data = atmosRes.ok ? await atmosRes.json() : {};
+    const marine = marineRes.ok ? (await marineRes.json()).current ?? {} : {};
     const c = data.current ?? {};
 
     const wdir: number | null = c.wind_direction_10m ?? null;
@@ -267,6 +277,10 @@ async function fetchOpenMeteoAtmospheric(
                                  ? calcDewPointC(tempC, humidity) : null,
       cloud_cover_pct:         c.cloud_cover ?? null,
       precipitation_mm:        r1(c.precipitation ?? null),
+      sst_buoy_c:              r1(marine.sea_surface_temperature ?? null),
+      wave_height_ft:          r1(marine.wave_height != null ? marine.wave_height * 3.281 : null),
+      wave_period_dominant_s:  r1(marine.wave_period ?? null),
+      wave_direction_deg:      r1(marine.wave_direction ?? null),
     };
   } catch (err) {
     console.warn('[OpenMeteo] Current atmospheric fetch failed:', err);
@@ -425,13 +439,13 @@ async function fetchAstroTimes(
   lat: number,
   lng: number,
   date: Date,
-): Promise<{ sunrise: string | null; sunset: string | null; moonrise: string | null; moonset: string | null }> {
+): Promise<{ sunrise: string | null; sunset: string | null; moonrise: string | null; moonset: string | null; moonUpperTransit: string | null }> {
   try {
     const dateStr = date.toISOString().split('T')[0];
     const tzOffset = -Math.round(date.getTimezoneOffset() / 60);
     const url = `https://aa.usno.navy.mil/api/rstt/oneday?date=${dateStr}&coords=${lat},${lng}&tz=${tzOffset}`;
     const res = await fetchWithTimeout(url, {}, 10000);
-    if (!res.ok) return { sunrise: null, sunset: null, moonrise: null, moonset: null };
+    if (!res.ok) return { sunrise: null, sunset: null, moonrise: null, moonset: null, moonUpperTransit: null };
     const json = await res.json();
 
     const sun: Array<{ phen: string; time: string }> = json?.properties?.data?.sundata  ?? [];
@@ -440,15 +454,53 @@ async function fetchAstroTimes(
       arr.find((e) => e.phen === phen)?.time ?? null;
 
     return {
-      sunrise:  pick(sun,  'Rise'),
-      sunset:   pick(sun,  'Set'),
-      moonrise: pick(moon, 'Rise'),
-      moonset:  pick(moon, 'Set'),
+      sunrise:          pick(sun,  'Rise'),
+      sunset:           pick(sun,  'Set'),
+      moonrise:         pick(moon, 'Rise'),
+      moonset:          pick(moon, 'Set'),
+      moonUpperTransit: pick(moon, 'Upper Transit'),
     };
   } catch (err) {
     console.warn('[USNO] Astro times fetch failed:', err);
-    return { sunrise: null, sunset: null, moonrise: null, moonset: null };
+    return { sunrise: null, sunset: null, moonrise: null, moonset: null, moonUpperTransit: null };
   }
+}
+
+// ── C. Solunar (computed locally from USNO transit times) ─────────────────
+
+function addMinutesToHHMM(hhmm: string, minutes: number): string {
+  const [h, m] = hhmm.split(':').map(Number);
+  const total = ((h * 60 + m + minutes) % (24 * 60) + 24 * 60) % (24 * 60);
+  return `${Math.floor(total / 60).toString().padStart(2, '0')}:${(total % 60).toString().padStart(2, '0')}`;
+}
+
+function computeSolunar(
+  astro: { moonrise: string | null; moonset: string | null; moonUpperTransit: string | null },
+  moonPhase: number | null,
+): Partial<TripConditions> {
+  const { moonrise, moonset, moonUpperTransit } = astro;
+
+  // Day rating: new/full moon = 6, quarter = 2, interpolated between
+  let dayRating: number | null = null;
+  if (moonPhase !== null) {
+    const distFromNew = Math.min(moonPhase, 1 - moonPhase);
+    const distFromFull = Math.abs(moonPhase - 0.5);
+    const distFromNearest = Math.min(distFromNew, distFromFull);
+    dayRating = Math.round(6 - (distFromNearest / 0.25) * 4);
+  }
+
+  return {
+    solunar_major_1_start: moonUpperTransit ? addMinutesToHHMM(moonUpperTransit, -60) : null,
+    solunar_major_1_stop:  moonUpperTransit ? addMinutesToHHMM(moonUpperTransit,  60) : null,
+    // Moon underfoot = upper transit + 12h 25min
+    solunar_major_2_start: moonUpperTransit ? addMinutesToHHMM(moonUpperTransit, 12 * 60 + 25 - 60) : null,
+    solunar_major_2_stop:  moonUpperTransit ? addMinutesToHHMM(moonUpperTransit, 12 * 60 + 25 + 60) : null,
+    solunar_minor_1_start: moonrise ? addMinutesToHHMM(moonrise, -30) : null,
+    solunar_minor_1_stop:  moonrise ? addMinutesToHHMM(moonrise,  30) : null,
+    solunar_minor_2_start: moonset  ? addMinutesToHHMM(moonset,  -30) : null,
+    solunar_minor_2_stop:  moonset  ? addMinutesToHHMM(moonset,   30) : null,
+    solunar_day_rating:    dayRating,
+  };
 }
 
 // ── C. OpenWeatherMap One Call 3.0 (moon phase only) ──────────────────────
@@ -493,39 +545,6 @@ async function fetchOWM(lat: number, lng: number): Promise<Partial<TripCondition
   }
 }
 
-// ── C. Solunar ─────────────────────────────────────────────────────────────
-
-async function fetchSolunar(
-  lat: number,
-  lng: number,
-  date: string,
-): Promise<Partial<TripConditions>> {
-  try {
-    const yyyymmdd = date.replace(/-/g, '');
-    const tz = -new Date().getTimezoneOffset() / 60;
-    const url = `https://api.solunar.org/solunar/${lat},${lng},${yyyymmdd},${tz}`;
-    const res = await fetchWithTimeout(url, {}, 10000);
-    if (!res.ok) {
-      console.warn('[Solunar] API returned', res.status);
-      return {};
-    }
-    const d = await res.json();
-    return {
-      solunar_major_1_start: d.major1Start ?? null,
-      solunar_major_1_stop:  d.major1Stop  ?? null,
-      solunar_major_2_start: d.major2Start ?? null,
-      solunar_major_2_stop:  d.major2Stop  ?? null,
-      solunar_minor_1_start: d.minor1Start ?? null,
-      solunar_minor_1_stop:  d.minor1Stop  ?? null,
-      solunar_minor_2_start: d.minor2Start ?? null,
-      solunar_minor_2_stop:  d.minor2Stop  ?? null,
-      solunar_day_rating:    d.dayRating !== undefined ? r1(d.dayRating) : null,
-    };
-  } catch (err) {
-    console.warn('[Solunar] fetch failed:', err);
-    return {};
-  }
-}
 
 // ── D. GLERL CoastWatch Satellite SST ─────────────────────────────────────
 
@@ -591,13 +610,18 @@ async function extractErddapValue(url: string, columnName: string): Promise<numb
     if (!table) return null;
     const colNames: string[] = table.columnNames ?? [];
     const idx = colNames.indexOf(columnName);
+    const timeIdx = colNames.indexOf('time');
     if (idx === -1) return null;
     const rows: Array<Array<unknown>> = table.rows ?? [];
-    const values = rows
-      .map((r) => r[idx])
-      .filter((v): v is number => typeof v === 'number' && !isNaN(v));
-    if (!values.length) return null;
-    return r1(values.reduce((a, b) => a + b, 0) / values.length);
+    // Sort ascending by time and return the most recent non-null pixel value
+    const sorted = timeIdx >= 0
+      ? [...rows].sort((a, b) => String(a[timeIdx] ?? '').localeCompare(String(b[timeIdx] ?? '')))
+      : rows;
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      const v = sorted[i][idx];
+      if (typeof v === 'number' && !isNaN(v)) return r1(v);
+    }
+    return null;
   } catch (err) {
     console.warn(`[GLERL] fetch failed for ${columnName}:`, err);
     return null;
@@ -610,15 +634,20 @@ async function fetchChlorophyllTurbidity(
   lakeId: string,
 ): Promise<{ chlorophyll_ug_l: number | null; turbidity_mg_l: number | null }> {
   const prefix = LAKE_ERDDAP_PREFIX[lakeId] ?? 'LH';
-  const lat0 = (lat - 0.1).toFixed(4);
-  const lat1 = (lat + 0.1).toFixed(4);
-  const lng0 = (lng - 0.1).toFixed(4);
-  const lng1 = (lng + 0.1).toFixed(4);
+  // ±0.5° box samples ~55×55 pixels — much more likely to find cloud-free pixels
+  const lat0 = (lat - 0.5).toFixed(4);
+  const lat1 = (lat + 0.5).toFixed(4);
+  const lng0 = (lng - 0.5).toFixed(4);
+  const lng1 = (lng + 0.5).toFixed(4);
   const base = 'https://apps.glerl.noaa.gov/erddap/griddap';
+  // 14-day lookback so cloud cover gaps don't wipe out the reading
+  const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split('T')[0] + 'T00:00:00Z';
 
   const [chlorophyll_ug_l, turbidity_mg_l] = await Promise.all([
     extractErddapValue(
-      `${base}/${prefix}_CHL_NRT.json?Chlorophyll[(last)][(${lat0}):(${lat1})][(${lng0}):(${lng1})]`,
+      `${base}/${prefix}_CHL_NRT.json?Chlorophyll[(${since}):(last)][(${lat0}):(${lat1})][(${lng0}):(${lng1})]`,
       'Chlorophyll',
     ),
     extractErddapValue(
@@ -764,11 +793,10 @@ export async function fetchTripConditions(
   // and works anywhere in the world.
   const skipNDBC = nearestBuoyKm > 200;
 
-  const [ndbcRaw, owm, omAtmo, solunar, glerl, prey, nws, uv, prevWind, astro, currents, pressureTrend] = await Promise.all([
+  const [ndbcRaw, owm, omAtmo, glerl, prey, nws, uv, prevWind, astro, currents, pressureTrend] = await Promise.all([
     skipNDBC ? Promise.resolve(null) : fetchNDBC(stationId),
     fetchOWM(lat, lng),
     fetchOpenMeteoAtmospheric(lat, lng),   // primary: same model as history
-    fetchSolunar(lat, lng, date),
     fetchGLERL(lat, lng),
     fetchChlorophyllTurbidity(lat, lng, lakeId),
     fetchNWSAlerts(lat, lng),
@@ -778,6 +806,8 @@ export async function fetchTripConditions(
     lakeId === 'georgian_bay' ? fetchMarineCurrents(lat, lng) : Promise.resolve({ current_speed_knots: null, current_direction_deg: null, current_direction_label: null }),
     fetchPressureTrend(lat, lng),
   ]);
+
+  const solunar = computeSolunar(astro, owm.moon_phase_value ?? calcMoonPhase(new Date()));
 
   // Atmospheric data: Open-Meteo (same model as history) is primary.
   // NDBC supplements with marine-specific data (waves, SST) when available.
@@ -799,13 +829,13 @@ export async function fetchTripConditions(
     precipitation_type:       owm.precipitation_type          ?? null,
     precipitation_mm:         omAtmo.precipitation_mm         ?? owm.precipitation_mm ?? null,
     visibility_km:            ndbcRaw?.visibility_km          ?? null,
-    wave_height_ft:           ndbcRaw?.wave_height_ft         ?? null,
-    wave_period_dominant_s:   ndbcRaw?.wave_period_dominant_s ?? null,
-    wave_direction_deg:       ndbcRaw?.wave_direction_deg     ?? null,
+    wave_height_ft:           ndbcRaw?.wave_height_ft         ?? omAtmo.wave_height_ft         ?? null,
+    wave_period_dominant_s:   ndbcRaw?.wave_period_dominant_s ?? omAtmo.wave_period_dominant_s ?? null,
+    wave_direction_deg:       ndbcRaw?.wave_direction_deg     ?? omAtmo.wave_direction_deg     ?? null,
     current_speed_knots:      currents.current_speed_knots    ?? null,
     current_direction_deg:    currents.current_direction_deg  ?? null,
     current_direction_label:  currents.current_direction_label ?? null,
-    sst_buoy_c:               ndbcRaw?.sst_buoy_c             ?? null,
+    sst_buoy_c:               ndbcRaw?.sst_buoy_c             ?? omAtmo.sst_buoy_c             ?? null,
     sst_satellite_c:          glerl.sst_satellite_c           ?? null,
     chlorophyll_ug_l:         prey.chlorophyll_ug_l           ?? null,
     turbidity_mg_l:           prey.turbidity_mg_l             ?? null,
