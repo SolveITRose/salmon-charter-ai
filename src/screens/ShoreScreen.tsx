@@ -178,7 +178,7 @@ export default function ShoreScreen() {
       };
 
       await updateEvent(updatedEvent);
-      await saveEventSnapshot(updatedEvent);
+      saveEventSnapshot(updatedEvent).catch(() => {});
       setCurrentEvent(updatedEvent);
       syncAllPending().catch(console.error);
       setScreenState('confirmed');
