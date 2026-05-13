@@ -65,6 +65,25 @@ export async function fetchTripConditions(
   return response.json();
 }
 
+export interface BuoyDetail {
+  wind_direction_deg: number | null;
+  wind_direction_label: string | null;
+  wind_speed_ms: number | null;
+  wind_gust_ms: number | null;
+  wave_height_m: number | null;
+  wave_period_s: number | null;
+  pressure_hpa: number | null;
+  pressure_tendency_hpa: number | null;
+  air_temp_c: number | null;
+  water_temp_c: number | null;
+}
+
+export async function fetchBuoyDetail(stationId: string): Promise<BuoyDetail> {
+  const response = await fetch(`${PROXY_URL}/buoy/${stationId}`);
+  if (!response.ok) throw new Error(`Proxy error: ${response.status}`);
+  return response.json();
+}
+
 export async function fetchPreyData(
   lat: number,
   lng: number,

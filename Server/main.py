@@ -496,6 +496,59 @@ async def get_conditions(lat: float, lng: float):
     env_cache[cache_key] = response
     return response
 
+async def fetch_ndbc_full(client, station_id):
+    try:
+        url = f"https://www.ndbc.noaa.gov/data/realtime2/{station_id}.txt"
+        resp = await client.get(url, timeout=10.0, headers=USER_AGENT)
+        lines = resp.text.strip().split("\n")
+        if len(lines) < 3: return {}
+        headers = lines[0].lstrip("#").split()
+        # find most recent row with real data (skip MM-only rows)
+        row = None
+        for line in lines[2:6]:
+            values = line.split()
+            if len(values) >= len(headers):
+                row = dict(zip(headers, values))
+                break
+        if not row: return {}
+
+        def mm(k):
+            v = row.get(k, "MM")
+            if v == "MM": return None
+            try: return float(v)
+            except: return None
+
+        wvht = mm("WVHT")
+        pres = mm("PRES")
+        ptdy = mm("PTDY")
+        wdir = mm("WDIR")
+        return {
+            "wind_direction_deg": round(wdir) if wdir is not None else None,
+            "wind_direction_label": degrees_to_cardinal(wdir),
+            "wind_speed_ms": mm("WSPD"),
+            "wind_gust_ms": mm("GST"),
+            "wave_height_m": r1(wvht) if wvht is not None else None,
+            "wave_period_s": mm("DPD"),
+            "pressure_hpa": r1(pres),
+            "pressure_tendency_hpa": r1(ptdy),
+            "air_temp_c": r1(mm("ATMP")),
+            "water_temp_c": r1(mm("WTMP")),
+        }
+    except:
+        return {}
+
+
+@app.get("/buoy/{station_id}")
+async def get_buoy(station_id: str):
+    cache_key = f"buoy_{station_id}"
+    if cache_key in env_cache:
+        return env_cache[cache_key]
+    async with httpx.AsyncClient() as client:
+        data = await fetch_ndbc_full(client, station_id)
+    env_cache[cache_key] = data
+    return data
+
+
 def is_canada(lat, lng):
     return 41.7 <= lat <= 83.0 and -141.0 <= lng <= -52.6
 

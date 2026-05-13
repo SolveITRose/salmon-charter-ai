@@ -1,13 +1,12 @@
-import React, { useRef, useEffect, memo } from 'react';
+import React, { useRef, useEffect, memo, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Animated,
   TouchableOpacity,
-  Linking,
 } from 'react-native';
-import { TripConditions } from '../services/weatherWaterService';
+import { TripConditions, BuoyDetail, fetchBuoyDetail } from '../services/weatherWaterService';
 import { celsiusToFahrenheit } from '../utils/formatters';
 
 function cToF(c: number | null): string {
@@ -209,6 +208,27 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
     );
   }
 
+  const [expandedBuoy, setExpandedBuoy] = useState<string | null>(null);
+  const [buoyData, setBuoyData] = useState<Record<string, BuoyDetail>>({});
+  const [buoyLoading, setBuoyLoading] = useState<Record<string, boolean>>({});
+
+  async function handleBuoyPress(stationId: string) {
+    if (expandedBuoy === stationId) {
+      setExpandedBuoy(null);
+      return;
+    }
+    setExpandedBuoy(stationId);
+    if (!buoyData[stationId]) {
+      setBuoyLoading(prev => ({ ...prev, [stationId]: true }));
+      try {
+        const data = await fetchBuoyDetail(stationId);
+        setBuoyData(prev => ({ ...prev, [stationId]: data }));
+      } finally {
+        setBuoyLoading(prev => ({ ...prev, [stationId]: false }));
+      }
+    }
+  }
+
   const ratingBars =
     conditions.solunar_day_rating !== null
       ? Math.round(Math.min(conditions.solunar_day_rating / 6, 1) * 5)
@@ -236,62 +256,7 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
         {`${conditions.query_lat.toFixed(4)}°N  ${Math.abs(conditions.query_lng).toFixed(4)}°W`}
       </Text>
 
-      {/* 1. Wind & Sky */}
-      <Section title={coordsLabel ? `Wind & Sky  ·  ${coordsLabel}` : 'Wind & Sky'}>
-        <Row
-          label="Pressure"
-          value={
-            conditions.barometric_pressure_hpa !== null
-              ? `${Math.round(conditions.barometric_pressure_hpa)} hPa${trendArrow(conditions.pressure_trend)}`
-              : '—'
-          }
-        />
-        <Row
-          label="Wind"
-          value={
-            conditions.wind_speed_mph !== null
-              ? `${Math.round(conditions.wind_speed_mph * 1.60934)} km/h ${conditions.wind_direction_label ?? ''}`
-              : '—'
-          }
-        />
-        <Row
-          label="Gusts"
-          value={conditions.wind_gust_mph !== null ? `${Math.round(conditions.wind_gust_mph * 1.60934)} km/h` : '—'}
-        />
-        <Row
-          label="Air Temp"
-          value={cToF(conditions.air_temp_c)}
-        />
-        <Row
-          label="Feels Like"
-          value={cToF(conditions.feels_like_c)}
-        />
-        <Row
-          label="Humidity"
-          value={conditions.humidity_pct !== null ? `${conditions.humidity_pct}%` : '—'}
-        />
-        <Row
-          label="Dew Point"
-          value={cToF(conditions.dew_point_c)}
-        />
-        <Row
-          label="Cloud Cover"
-          value={conditions.cloud_cover_pct !== null ? `${conditions.cloud_cover_pct}%` : '—'}
-        />
-        <Row
-          label="Precipitation"
-          value={conditions.precipitation_mm !== null ? `${Math.round(conditions.precipitation_mm)} mm` : '—'}
-        />
-        <Row
-          label="UV Index"
-          value={(() => {
-            const uv = attenuatedUV(conditions.uv_index, conditions.cloud_cover_pct);
-            return uv !== null ? `${Math.round(uv)} · ${uvLabel(Math.round(uv))}` : '—';
-          })()}
-        />
-      </Section>
-
-      {/* 2. Weather History */}
+      {/* 1. Weather History */}
       {conditions.previous_wind && conditions.previous_wind.length > 0 && (
         <Section title={coordsLabel ? `Weather History (last 24h, ${coordsLabel})` : 'Weather History (last 24h)'}>
           <View style={styles.windHistoryHeader}>
@@ -315,54 +280,45 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
         </Section>
       )}
 
-      {/* 3. Water */}
+      {/* 2. Water — Southern Georgian Bay Buoys */}
       <Section title="Water">
-        <Row
-          label="SST (Buoy)"
-          value={cToF(conditions.sst_buoy_c)}
-        />
-        <Row
-          label="SST (Satellite)"
-          value={cToF(conditions.sst_satellite_c)}
-        />
-        <Row
-          label="Wave Height"
-          value={conditions.wave_height_ft !== null ? `${Math.round(conditions.wave_height_ft)} ft` : '—'}
-        />
-        <Row
-          label="Wave Period"
-          value={
-            conditions.wave_period_dominant_s !== null
-              ? `${Math.round(conditions.wave_period_dominant_s)} s`
-              : '—'
-          }
-        />
-        <Row
-          label="Wave Direction"
-          value={
-            conditions.wave_direction_deg !== null
-              ? `${degreesToCardinal(conditions.wave_direction_deg)}  ${conditions.wave_direction_deg}°`
-              : '—'
-          }
-        />
-        <Row
-          label="Current Speed"
-          value={conditions.current_speed_knots !== null ? `${conditions.current_speed_knots.toFixed(2)} kn` : '—'}
-        />
-        <Row
-          label="Current Direction"
-          value={
-            conditions.current_direction_deg !== null
-              ? `${conditions.current_direction_label}  ${conditions.current_direction_deg}°`
-              : '—'
-          }
-        />
-        <TouchableOpacity
-          onPress={() => Linking.openURL('https://www.glerl.noaa.gov/res/glcfs/ncast.php?lake=mih')}
-          style={styles.glerlLink}
-        >
-          <Text style={styles.glerlLinkText}>View Georgian Bay Currents → GLERL</Text>
-        </TouchableOpacity>
+        <View style={styles.buoyTableHeader}>
+          <Text style={[styles.buoyCol, styles.buoyColId, styles.buoyHeaderText]}>ID</Text>
+          <Text style={[styles.buoyCol, styles.buoyColName, styles.buoyHeaderText]}>Name</Text>
+          <Text style={[styles.buoyCol, styles.buoyColLocation, styles.buoyHeaderText]}>Location</Text>
+        </View>
+        {[
+          { id: '45137', name: 'Georgian Bay',       location: '45.540°N 81.020°W · Western Islands' },
+          { id: '45143', name: 'South Georgian Bay', location: '44.940°N 80.627°W · Near Collingwood' },
+        ].map((buoy) => (
+          <View key={buoy.id}>
+            <View style={styles.buoyRow}>
+              <TouchableOpacity style={[styles.buoyCol, styles.buoyColId]} onPress={() => handleBuoyPress(buoy.id)}>
+                <Text style={styles.buoyIdLink}>{buoy.id}</Text>
+              </TouchableOpacity>
+              <Text style={[styles.buoyCol, styles.buoyColName, styles.buoyText]}>{buoy.name}</Text>
+              <Text style={[styles.buoyCol, styles.buoyColLocation, styles.buoyText]}>{buoy.location}</Text>
+            </View>
+            {expandedBuoy === buoy.id && (
+              <View style={styles.buoyDetail}>
+                {buoyLoading[buoy.id] ? (
+                  <Text style={styles.buoyDetailLoading}>Loading…</Text>
+                ) : buoyData[buoy.id] ? (
+                  <>
+                    <Row label="Wind Direction" value={buoyData[buoy.id].wind_direction_deg !== null ? `${buoyData[buoy.id].wind_direction_deg}° (${buoyData[buoy.id].wind_direction_label ?? '—'})` : '—'} />
+                    <Row label="Wind Speed"     value={buoyData[buoy.id].wind_speed_ms !== null ? `${buoyData[buoy.id].wind_speed_ms} m/s` : '—'} />
+                    <Row label="Wind Gust"      value={buoyData[buoy.id].wind_gust_ms !== null ? `${buoyData[buoy.id].wind_gust_ms} m/s` : '—'} />
+                    <Row label="Wave Height"    value={buoyData[buoy.id].wave_height_m !== null ? `${buoyData[buoy.id].wave_height_m} m` : '—'} />
+                    <Row label="Wave Period"    value={buoyData[buoy.id].wave_period_s !== null ? `${buoyData[buoy.id].wave_period_s} s` : '—'} />
+                    <Row label="Pressure"       value={buoyData[buoy.id].pressure_hpa !== null ? `${buoyData[buoy.id].pressure_hpa} hPa${buoyData[buoy.id].pressure_tendency_hpa !== null ? (buoyData[buoy.id].pressure_tendency_hpa! > 0 ? ' ↑' : ' ↓') : ''}` : '—'} />
+                    <Row label="Air Temp"       value={buoyData[buoy.id].air_temp_c !== null ? `${buoyData[buoy.id].air_temp_c}°C` : '—'} />
+                    <Row label="Water Temp"     value={buoyData[buoy.id].water_temp_c !== null ? `${buoyData[buoy.id].water_temp_c}°C` : '—'} />
+                  </>
+                ) : null}
+              </View>
+            )}
+          </View>
+        ))}
       </Section>
 
       {/* 4. Food Chain */}
@@ -584,14 +540,60 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     paddingVertical: 4,
   },
-  glerlLink: {
-    marginTop: 6,
-    paddingVertical: 4,
+  buoyTableHeader: {
+    flexDirection: 'row',
+    paddingBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a2d4a',
+    marginBottom: 2,
   },
-  glerlLinkText: {
+  buoyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a2d4a',
+  },
+  buoyCol: {
+    flex: 1,
+  },
+  buoyColId: {
+    flex: 0.7,
+  },
+  buoyColName: {
+    flex: 1.4,
+  },
+  buoyColLocation: {
+    flex: 2,
+  },
+  buoyHeaderText: {
+    color: '#8899aa',
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  buoyText: {
+    color: '#ffffff',
+    fontSize: 11,
+  },
+  buoyIdLink: {
     color: '#1e90ff',
-    fontSize: 12,
+    fontSize: 11,
     textDecorationLine: 'underline',
+    fontWeight: '600',
+  },
+  buoyDetail: {
+    backgroundColor: '#0d1a2e',
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginVertical: 4,
+  },
+  buoyDetailLoading: {
+    color: '#8899aa',
+    fontSize: 12,
+    paddingVertical: 6,
+    textAlign: 'center',
   },
   retryButton: {
     alignSelf: 'center',
