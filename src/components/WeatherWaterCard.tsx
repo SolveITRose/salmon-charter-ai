@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Animated,
   TouchableOpacity,
+  Linking,
 } from 'react-native';
 import { TripConditions, BuoyDetail, fetchBuoyDetail } from '../services/weatherWaterService';
 import { celsiusToFahrenheit } from '../utils/formatters';
@@ -308,6 +309,12 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
             )}
           </View>
         ))}
+        <TouchableOpacity
+          onPress={() => Linking.openURL('https://www.glerl.noaa.gov/res/glcfs/ncast.php?lake=mih')}
+          style={styles.glerlLink}
+        >
+          <Text style={styles.glerlLinkText}>View Georgian Bay Currents → GLERL</Text>
+        </TouchableOpacity>
       </Section>
 
       {/* 4. Food Chain */}
@@ -583,6 +590,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     paddingVertical: 6,
     textAlign: 'center',
+  },
+  glerlLink: {
+    marginTop: 8,
+    paddingVertical: 4,
+  },
+  glerlLinkText: {
+    color: '#1e90ff',
+    fontSize: 12,
+    textDecorationLine: 'underline',
   },
   retryButton: {
     alignSelf: 'center',
