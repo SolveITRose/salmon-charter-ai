@@ -23,7 +23,6 @@ jobs:
         run: npx expo export --platform web
         env:
           EXPO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.EXPO_PUBLIC_ANTHROPIC_API_KEY }}
-          EXPO_PUBLIC_OWM_API_KEY: ${{ secrets.EXPO_PUBLIC_OWM_API_KEY }}
           EXPO_PUBLIC_SIGNALK_PORT: ${{ secrets.EXPO_PUBLIC_SIGNALK_PORT }}
           EXPO_PUBLIC_PROXY_URL: ${{ secrets.EXPO_PUBLIC_PROXY_URL }}
 

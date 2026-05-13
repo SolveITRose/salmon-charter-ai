@@ -496,6 +496,118 @@ async def get_conditions(lat: float, lng: float):
     env_cache[cache_key] = response
     return response
 
+def is_canada(lat, lng):
+    return 41.7 <= lat <= 83.0 and -141.0 <= lng <= -52.6
+
+async def fetch_water_body_name(client, lat, lng):
+    try:
+        url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lng}&zoom=14"
+        resp = await client.get(url, headers=USER_AGENT, timeout=10.0)
+        data = resp.json()
+        cls = data.get("class", "")
+        typ = data.get("type", "")
+        addr = data.get("address", {})
+        display = data.get("name")
+        city = addr.get("city") or addr.get("town") or addr.get("village") or addr.get("municipality") or addr.get("county")
+
+        if cls == "waterway" or typ == "river":
+            return display or addr.get("river"), "river", city
+        if typ in ("stream", "creek"):
+            return display or addr.get("stream"), "stream", city
+        if typ == "bay":
+            return display or addr.get("bay"), "bay", city
+        if cls == "natural" and typ in ("water", "lake"):
+            return display or addr.get("lake") or addr.get("water"), "lake", city
+        if addr.get("river"):  return addr["river"], "river", city
+        if addr.get("stream"): return addr["stream"], "stream", city
+        if addr.get("bay"):    return addr["bay"], "bay", city
+        if addr.get("lake"):   return addr["lake"], "lake", city
+        return None, "unknown", city
+    except:
+        return None, "unknown", None
+
+async def fetch_eccc_gauge(client, lat, lng):
+    try:
+        st_url = (
+            f"https://api.weather.gc.ca/collections/hydrometric-stations/items"
+            f"?near={lng},{lat}&near-distance=50000&status=Active&f=json&limit=1"
+        )
+        st_resp = await client.get(st_url, timeout=10.0)
+        features = st_resp.json().get("features", [])
+        if not features: return None, None, None
+        props = features[0]["properties"]
+        station_num = props.get("STATION_NUMBER")
+        gauge_name = props.get("STATION_NAME")
+
+        data_url = (
+            f"https://api.weather.gc.ca/collections/hydrometric-realtime/items"
+            f"?station_number={station_num}&f=json&limit=1&sortby=-DATETIME"
+        )
+        data_resp = await client.get(data_url, timeout=10.0)
+        obs = (data_resp.json().get("features") or [{}])[0].get("properties", {})
+        return obs.get("LEVEL"), obs.get("DISCHARGE"), gauge_name
+    except:
+        return None, None, None
+
+async def fetch_usgs_gauge(client, lat, lng):
+    try:
+        url = (
+            f"https://waterservices.usgs.gov/nwis/iv/?format=json"
+            f"&latitude={lat}&longitude={lng}"
+            f"&siteType=ST&siteStatus=active&radius=30&radiusUnits=km&parameterCd=00060,00065"
+        )
+        resp = await client.get(url, timeout=10.0)
+        time_series = resp.json().get("value", {}).get("timeSeries", [])
+        if not time_series: return None, None, None
+
+        gauge_name = time_series[0].get("sourceInfo", {}).get("siteName")
+        level_ft = flow_cfs = None
+        for ts in time_series:
+            p_code = (ts.get("variable", {}).get("variableCode") or [{}])[0].get("value", "")
+            raw = ((ts.get("values") or [{}])[0].get("value") or [{}])[0].get("value", "")
+            try:
+                val = float(raw)
+                if p_code == "00065": level_ft = val
+                if p_code == "00060": flow_cfs = val
+            except:
+                pass
+
+        level_m = round(level_ft * 0.3048, 2) if level_ft is not None else None
+        flow_cms = round(flow_cfs * 0.0283168, 1) if flow_cfs is not None else None
+        return level_m, flow_cms, gauge_name
+    except:
+        return None, None, None
+
+
+@app.get("/water-body")
+async def get_water_body(lat: float, lng: float):
+    cache_key = f"wb_{round(lat, 2)}_{round(lng, 2)}"
+    if cache_key in env_cache:
+        return env_cache[cache_key]
+
+    async with httpx.AsyncClient() as client:
+        name, water_type, nearest_city = await fetch_water_body_name(client, lat, lng)
+        is_river = water_type in ("river", "stream")
+
+        level_m = flow_cms = gauge_name = None
+        if is_river:
+            if is_canada(lat, lng):
+                level_m, flow_cms, gauge_name = await fetch_eccc_gauge(client, lat, lng)
+            else:
+                level_m, flow_cms, gauge_name = await fetch_usgs_gauge(client, lat, lng)
+
+    response = {
+        "name": name,
+        "type": water_type,
+        "nearestCity": nearest_city,
+        "waterLevel_m": level_m,
+        "flow_cms": flow_cms,
+        "gaugeStation": gauge_name,
+    }
+    env_cache[cache_key] = response
+    return response
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
