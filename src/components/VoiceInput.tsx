@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import { formatDuration } from '../utils/formatters';
 
-// Audio recording is mobile-only; imports skipped on web to avoid bundler errors
 const Audio = Platform.OS !== 'web' ? require('expo-av').Audio : null;
 const FileSystem = Platform.OS !== 'web' ? require('expo-file-system/legacy') : null;
 
@@ -32,7 +31,13 @@ export default function VoiceInput({ onTranscriptComplete, disabled }: VoiceInpu
   const [audioPath, setAudioPath] = useState('');
   const [audioDuration, setAudioDuration] = useState(0);
 
+  // Native recording refs
   const recordingRef = useRef<any>(null);
+  // Web recording refs
+  const mediaRecorderRef = useRef<any>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const capturedDurationRef = useRef(0);
+
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -41,14 +46,59 @@ export default function VoiceInput({ onTranscriptComplete, disabled }: VoiceInpu
       if (recordingRef.current) {
         recordingRef.current.stopAndUnloadAsync().catch(() => {});
       }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
     };
   }, []);
 
-  const startRecording = async () => {
-    if (!Audio) {
-      Alert.alert('Not Available', 'Voice recording is only available on the mobile app.');
-      return;
+  // ─── Web recording ────────────────────────────────────────────────────────
+
+  const startRecordingWeb = async () => {
+    try {
+      const stream = await (navigator as any).mediaDevices.getUserMedia({ audio: true });
+      const recorder = new (window as any).MediaRecorder(stream);
+      chunksRef.current = [];
+
+      recorder.ondataavailable = (e: any) => {
+        if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const url = URL.createObjectURL(blob);
+        stream.getTracks().forEach((t: any) => t.stop());
+        setAudioPath(url);
+        setRecordingState('done');
+        onTranscriptComplete(url, '', capturedDurationRef.current);
+      };
+
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setRecordingState('recording');
+      setElapsed(0);
+
+      timerRef.current = setInterval(() => setElapsed((prev) => prev + 1), 1000);
+    } catch {
+      Alert.alert('Permission Required', 'Microphone access is needed for voice notes.');
     }
+  };
+
+  const stopRecordingWeb = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    capturedDurationRef.current = elapsed;
+    setAudioDuration(elapsed);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  // ─── Native recording ─────────────────────────────────────────────────────
+
+  const startRecording = async () => {
     try {
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== 'granted') {
@@ -69,9 +119,7 @@ export default function VoiceInput({ onTranscriptComplete, disabled }: VoiceInpu
       setRecordingState('recording');
       setElapsed(0);
 
-      timerRef.current = setInterval(() => {
-        setElapsed((prev) => prev + 1);
-      }, 1000);
+      timerRef.current = setInterval(() => setElapsed((prev) => prev + 1), 1000);
     } catch (error) {
       console.error('[VoiceInput] startRecording error:', error);
       Alert.alert('Recording Error', 'Could not start recording.');
@@ -107,6 +155,16 @@ export default function VoiceInput({ onTranscriptComplete, disabled }: VoiceInpu
     }
   };
 
+  // ─── Unified handlers ─────────────────────────────────────────────────────
+
+  const handlePressRecord = () => {
+    if (recordingState === 'recording') {
+      Platform.OS === 'web' ? stopRecordingWeb() : stopRecording();
+    } else {
+      Platform.OS === 'web' ? startRecordingWeb() : startRecording();
+    }
+  };
+
   const handleTranscriptEdit = (text: string) => {
     setTranscript(text);
     if (audioPath) {
@@ -137,7 +195,7 @@ export default function VoiceInput({ onTranscriptComplete, disabled }: VoiceInpu
               isRecording && styles.recordButtonActive,
               disabled && styles.recordButtonDisabled,
             ]}
-            onPress={isRecording ? stopRecording : startRecording}
+            onPress={handlePressRecord}
             disabled={disabled}
           >
             <View style={[styles.recordIcon, isRecording && styles.recordIconStop]} />
