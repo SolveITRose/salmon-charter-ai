@@ -546,18 +546,19 @@ async function fetchOWM(lat: number, lng: number): Promise<Partial<TripCondition
 }
 
 
-// ── D. GLERL CoastWatch Satellite SST ─────────────────────────────────────
+// ── D. GLERL GLSEA ACSPO Satellite SST ────────────────────────────────────
 
 async function fetchGLERL(lat: number, lng: number): Promise<Partial<TripConditions>> {
   try {
-    const lat0 = (lat - 0.1).toFixed(4);
-    const lat1 = (lat + 0.1).toFixed(4);
-    const lng0 = (lng - 0.1).toFixed(4);
-    const lng1 = (lng + 0.1).toFixed(4);
+    // ±0.3° box — stays within GLSEA_ACSPO_GCS grid bounds
+    const lat0 = (lat - 0.3).toFixed(4);
+    const lat1 = (lat + 0.3).toFixed(4);
+    const lng0 = (lng - 0.3).toFixed(4);
+    const lng1 = (lng + 0.3).toFixed(4);
     const url =
-      `https://coastwatch.glerl.noaa.gov/erddap/griddap/GLSEA_L3S_daily.json` +
-      `?analysed_sst[(last)][(${lat0}):(${lat1})][(${lng0}):(${lng1})]`;
-    const res = await fetchWithTimeout(url, {}, 12000);
+      `https://apps.glerl.noaa.gov/erddap/griddap/GLSEA_ACSPO_GCS.json` +
+      `?sst[(last)][(${lat0}):(${lat1})][(${lng0}):(${lng1})]`;
+    const res = await fetchWithTimeout(url, { mode: 'cors' }, 12000);
     if (!res.ok) {
       console.warn('[GLERL] ERDDAP returned', res.status);
       return { sst_satellite_c: null };
@@ -567,13 +568,13 @@ async function fetchGLERL(lat: number, lng: number): Promise<Partial<TripConditi
     if (!table) return { sst_satellite_c: null };
 
     const colNames: string[] = table.columnNames ?? [];
-    const sstIdx = colNames.indexOf('analysed_sst');
+    const sstIdx = colNames.indexOf('sst');
     if (sstIdx === -1) return { sst_satellite_c: null };
 
     const rows: Array<Array<unknown>> = table.rows ?? [];
     const values = rows
       .map((r) => r[sstIdx])
-      .filter((v): v is number => typeof v === 'number' && !isNaN(v));
+      .filter((v): v is number => typeof v === 'number' && !isNaN(v) && v > -9);
 
     if (!values.length) return { sst_satellite_c: null };
 
@@ -634,14 +635,14 @@ async function fetchChlorophyllTurbidity(
   lakeId: string,
 ): Promise<{ chlorophyll_ug_l: number | null; turbidity_mg_l: number | null }> {
   const prefix = LAKE_ERDDAP_PREFIX[lakeId] ?? 'LH';
-  // ±0.5° box samples ~55×55 pixels — much more likely to find cloud-free pixels
-  const lat0 = (lat - 0.5).toFixed(4);
-  const lat1 = (lat + 0.5).toFixed(4);
-  const lng0 = (lng - 0.5).toFixed(4);
-  const lng1 = (lng + 0.5).toFixed(4);
+  // ±0.3° box — stays within CHL dataset grid bounds
+  const lat0 = (lat - 0.3).toFixed(4);
+  const lat1 = (lat + 0.3).toFixed(4);
+  const lng0 = (lng - 0.3).toFixed(4);
+  const lng1 = (lng + 0.3).toFixed(4);
   const base = 'https://apps.glerl.noaa.gov/erddap/griddap';
-  // 14-day lookback so cloud cover gaps don't wipe out the reading
-  const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
+  // 30-day lookback — dataset can lag by 2–3 weeks due to cloud cover; 14 days is too short
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
     .toISOString()
     .split('T')[0] + 'T00:00:00Z';
 
