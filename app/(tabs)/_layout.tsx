@@ -55,6 +55,16 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="shore"
+        options={{
+          title: 'Shore',
+          headerTitle: 'Shore Log',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="location" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="triplog"
         options={{
           title: 'Trip Log',

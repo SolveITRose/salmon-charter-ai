@@ -78,6 +78,8 @@ export interface CatchEvent {
   weightLbsEstimate: number | null;
   synced: boolean;
   syncedAt?: string;
+  shorePhoto?: string;
+  shorePin?: { x: number; y: number };
 }
 
 export type MarkType = 'bait' | 'fish' | 'fish_bait' | 'structure' | 'other';
