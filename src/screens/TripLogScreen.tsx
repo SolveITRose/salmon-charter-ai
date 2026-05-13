@@ -46,6 +46,7 @@ export default function TripLogScreen() {
   const [insightLoading, setInsightLoading] = useState(false);
   const [sound, setSound] = useState<any>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [shoreImageLayout, setShoreImageLayout] = useState({ width: 1, height: 1 });
 
   const loadEvents = useCallback(async () => {
     try {
@@ -291,12 +292,32 @@ export default function TripLogScreen() {
               showsVerticalScrollIndicator={false}
             >
               {/* Photo */}
-              {selectedEvent.photo ? (
-                <Image
-                  source={{ uri: selectedEvent.photo }}
-                  style={styles.detailPhoto}
-                  resizeMode="cover"
-                />
+              {selectedEvent.photo || selectedEvent.shorePhoto ? (
+                <View
+                  onLayout={(e) => {
+                    const { width, height } = e.nativeEvent.layout;
+                    setShoreImageLayout({ width, height });
+                  }}
+                  style={{ position: 'relative' }}
+                >
+                  <Image
+                    source={{ uri: selectedEvent.photo || selectedEvent.shorePhoto! }}
+                    style={styles.detailPhoto}
+                    resizeMode="cover"
+                  />
+                  {selectedEvent.shorePin && (
+                    <View
+                      pointerEvents="none"
+                      style={{
+                        position: 'absolute',
+                        left: selectedEvent.shorePin.x * shoreImageLayout.width - 12,
+                        top: selectedEvent.shorePin.y * shoreImageLayout.height - 24,
+                      }}
+                    >
+                      <Text style={{ fontSize: 24 }}>📍</Text>
+                    </View>
+                  )}
+                </View>
               ) : (
                 <View style={styles.detailPhotoPlaceholder}>
                   <Text style={styles.detailPhotoPlaceholderText}>
