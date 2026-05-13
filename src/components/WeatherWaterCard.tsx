@@ -208,16 +208,16 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
     );
   }
 
-  const [expandedBuoy, setExpandedBuoy] = useState<string | null>(null);
+  const [expandedBuoys, setExpandedBuoys] = useState<string[]>([]);
   const [buoyData, setBuoyData] = useState<Record<string, BuoyDetail>>({});
   const [buoyLoading, setBuoyLoading] = useState<Record<string, boolean>>({});
 
   async function handleBuoyPress(stationId: string) {
-    if (expandedBuoy === stationId) {
-      setExpandedBuoy(null);
+    if (expandedBuoys.includes(stationId)) {
+      setExpandedBuoys(prev => prev.filter(id => id !== stationId));
       return;
     }
-    setExpandedBuoy(stationId);
+    setExpandedBuoys(prev => [...prev, stationId]);
     if (!buoyData[stationId]) {
       setBuoyLoading(prev => ({ ...prev, [stationId]: true }));
       try {
@@ -244,17 +244,6 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
           </Text>
         </View>
       )}
-
-      <Text style={styles.cardTitle}>Current Conditions</Text>
-      <Text style={styles.cardSubtitle}>
-        {conditions.lake_id.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-        {'  ·  '}
-        {conditions.atmospheric_source === 'ndbc'
-          ? `Buoy ${conditions.ndbc_station_id}`
-          : 'OpenWeatherMap (buoy offline)'}
-        {'  ·  '}
-        {`${conditions.query_lat.toFixed(4)}°N  ${Math.abs(conditions.query_lng).toFixed(4)}°W`}
-      </Text>
 
       {/* 1. Weather History */}
       {conditions.previous_wind && conditions.previous_wind.length > 0 && (
@@ -299,7 +288,7 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
               <Text style={[styles.buoyCol, styles.buoyColName, styles.buoyText]}>{buoy.name}</Text>
               <Text style={[styles.buoyCol, styles.buoyColLocation, styles.buoyText]}>{buoy.location}</Text>
             </View>
-            {expandedBuoy === buoy.id && (
+            {expandedBuoys.includes(buoy.id) && (
               <View style={styles.buoyDetail}>
                 {buoyLoading[buoy.id] ? (
                   <Text style={styles.buoyDetailLoading}>Loading…</Text>
