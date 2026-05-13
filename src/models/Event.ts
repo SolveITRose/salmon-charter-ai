@@ -37,6 +37,9 @@ export interface SetupData {
   rigPosition?: string;      // 'Main' | 'Slider'
   boatSide?: string;         // 'Port' | 'Starboard'
   lineType?: string;         // 'Mono' | 'Braid' | 'Leadcore' | 'Fluorocarbon'
+  waveDirection?: string;    // 'Stern' | 'Port' | 'Starboard' | 'Bow'
+  boatHeading?: string;      // compass direction e.g. 'NW'
+  windDir?: string;          // compass direction e.g. 'SW'
 }
 
 export interface VoiceNote {

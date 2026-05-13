@@ -47,6 +47,8 @@ export default function TripLogScreen() {
   const [sound, setSound] = useState<any>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [shoreImageLayout, setShoreImageLayout] = useState({ width: 1, height: 1 });
+  const [selectedMark, setSelectedMark] = useState<GpsMark | null>(null);
+  const [markModalVisible, setMarkModalVisible] = useState(false);
 
   const loadEvents = useCallback(async () => {
     try {
@@ -87,6 +89,11 @@ export default function TripLogScreen() {
   const handleEventPress = useCallback((event: CatchEvent) => {
     setSelectedEvent(event);
     setDetailModalVisible(true);
+  }, []);
+
+  const handleMarkPress = useCallback((mark: GpsMark) => {
+    setSelectedMark(mark);
+    setMarkModalVisible(true);
   }, []);
 
   const handleCloseDetail = useCallback(() => {
@@ -171,8 +178,8 @@ export default function TripLogScreen() {
     ({ item }: { item: FeedItem }) =>
       item.type === 'catch'
         ? <CatchCard event={item.data} onPress={handleEventPress} />
-        : <MarkCard mark={item.data} />,
-    [handleEventPress]
+        : <MarkCard mark={item.data} onPress={handleMarkPress} />,
+    [handleEventPress, handleMarkPress]
   );
 
   const keyExtractor = useCallback(
@@ -267,7 +274,80 @@ export default function TripLogScreen() {
         />
       )}
 
-      {/* Detail Modal */}
+      {/* Mark Detail Modal */}
+      <Modal
+        visible={markModalVisible}
+        animationType="slide"
+        onRequestClose={() => { setMarkModalVisible(false); setSelectedMark(null); }}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              onPress={() => { setMarkModalVisible(false); setSelectedMark(null); }}
+              style={styles.modalCloseButton}
+            >
+              <Text style={styles.modalCloseText}>← Back</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Mark Detail</Text>
+            <View style={{ width: 60 }} />
+          </View>
+
+          {selectedMark && (
+            <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent} showsVerticalScrollIndicator={false}>
+              <View style={styles.detailBanner}>
+                <Text style={styles.detailCode}>{selectedMark.markType.replace('_', ' + ').toUpperCase()}</Text>
+                <Text style={styles.detailTime}>{formatTimestamp(selectedMark.timestamp)}</Text>
+              </View>
+
+              {selectedMark.gps.lat !== 0 && (
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionTitle}>Location</Text>
+                  <Text style={styles.detailMeta}>{formatGPS(selectedMark.gps.lat, selectedMark.gps.lng)}</Text>
+                </View>
+              )}
+
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>Conditions</Text>
+                <Text style={styles.detailMeta}>{selectedMark.weather.conditions}</Text>
+                <Text style={styles.detailMeta}>
+                  Air: {Math.round(celsiusToFahrenheit(selectedMark.weather.airTemp))}°F · Wind: {Math.round(selectedMark.weather.windSpeed)} km/h
+                </Text>
+              </View>
+
+              {selectedMark.fishFinder && (
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionTitle}>Fish Finder</Text>
+                  <View style={styles.setupGrid}>
+                    {selectedMark.fishFinder.depth !== undefined && (
+                      <SetupRow label="Depth" value={`${Math.round(selectedMark.fishFinder.depth)} ft`} />
+                    )}
+                    {selectedMark.fishFinder.waterTemp !== undefined && (
+                      <SetupRow label="Water Temp" value={`${Math.round(celsiusToFahrenheit(selectedMark.fishFinder.waterTemp))}°F`} />
+                    )}
+                    {selectedMark.fishFinder.baitOnScreen !== undefined && (
+                      <SetupRow label="Bait on Screen" value={selectedMark.fishFinder.baitOnScreen ? 'Yes' : 'No'} />
+                    )}
+                  </View>
+                </View>
+              )}
+
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>HydroScore</Text>
+                <HydroScoreCard hydroScore={selectedMark.hydroScore} />
+              </View>
+
+              {selectedMark.notes ? (
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionTitle}>Notes</Text>
+                  <Text style={styles.detailNotes}>{selectedMark.notes}</Text>
+                </View>
+              ) : null}
+            </ScrollView>
+          )}
+        </View>
+      </Modal>
+
+      {/* Catch Detail Modal */}
       <Modal
         visible={detailModalVisible}
         animationType="slide"

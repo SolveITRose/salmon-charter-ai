@@ -20,13 +20,14 @@ import { classifyCatch } from '../agents/catchClassifier';
 import { syncAllPending } from '../services/syncService';
 import EventJoinModal from '../components/EventJoinModal';
 import VoiceInput from '../components/VoiceInput';
-import WeatherWidget from '../components/WeatherWidget';
 import { formatTimestamp } from '../utils/formatters';
 
+const LURE_TYPES = ['Spoon', 'Flasher fly', 'Plug', 'Body bait'];
 const RIG_TYPES = ['Downrigger', 'Flatline'];
 const RIG_POSITIONS = ['Main', 'Slider'];
-const BOAT_SIDES = ['Port', 'Starboard'];
 const LINE_TYPES = ['Mono', 'Braid', 'Leadcore', 'Fluorocarbon'];
+const WAVE_DIRECTIONS = ['Stern', 'Port', 'Starboard', 'Bow'];
+const COMPASS_DIRS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 
 type ScreenState = 'home' | 'setup' | 'saving' | 'confirmed';
 
@@ -43,8 +44,10 @@ export default function MateScreen() {
   const [trollingSpeed, setTrollingSpeed] = useState('');
   const [rigType, setRigType] = useState('');
   const [rigPosition, setRigPosition] = useState('');
-  const [boatSide, setBoatSide] = useState('');
   const [lineType, setLineType] = useState('');
+  const [waveDirection, setWaveDirection] = useState('');
+  const [boatHeading, setBoatHeading] = useState('');
+  const [windDir, setWindDir] = useState('');
   const [voiceAudioPath, setVoiceAudioPath] = useState('');
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const [voiceDuration, setVoiceDuration] = useState(0);
@@ -71,8 +74,10 @@ export default function MateScreen() {
     if (event.setup.trollingSpeed > 0) setTrollingSpeed(String(event.setup.trollingSpeed));
     if (event.setup.rigType) setRigType(event.setup.rigType);
     if (event.setup.rigPosition) setRigPosition(event.setup.rigPosition);
-    if (event.setup.boatSide) setBoatSide(event.setup.boatSide);
     if (event.setup.lineType) setLineType(event.setup.lineType);
+    if (event.setup.waveDirection) setWaveDirection(event.setup.waveDirection);
+    if (event.setup.boatHeading) setBoatHeading(event.setup.boatHeading);
+    if (event.setup.windDir) setWindDir(event.setup.windDir);
 
     setScreenState('setup');
   }, []);
@@ -115,13 +120,15 @@ export default function MateScreen() {
       const setupData: SetupData = {
         downriggerDepth: parseFloat(downriggerDepth) || 0,
         backFromBall: parseFloat(backFromBall) || undefined,
-        lureType: lureType.trim(),
+        lureType: lureType,
         lureColor: lureColor.trim(),
         trollingSpeed: parseFloat(trollingSpeed) || 0,
         rigType: rigType || undefined,
         rigPosition: rigPosition || undefined,
-        boatSide: boatSide || undefined,
         lineType: lineType || undefined,
+        waveDirection: waveDirection || undefined,
+        boatHeading: boatHeading || undefined,
+        windDir: windDir || undefined,
       };
 
       let updatedEvent: CatchEvent = {
@@ -193,8 +200,10 @@ export default function MateScreen() {
     trollingSpeed,
     rigType,
     rigPosition,
-    boatSide,
     lineType,
+    waveDirection,
+    boatHeading,
+    windDir,
     voiceAudioPath,
     voiceTranscript,
     voiceDuration,
@@ -211,8 +220,10 @@ export default function MateScreen() {
     setTrollingSpeed('');
     setRigType('');
     setRigPosition('');
-    setBoatSide('');
     setLineType('');
+    setWaveDirection('');
+    setBoatHeading('');
+    setWindDir('');
     setVoiceAudioPath('');
     setVoiceTranscript('');
     setVoiceDuration(0);
@@ -363,15 +374,39 @@ export default function MateScreen() {
             )}
           </View>
 
-          {/* Weather summary */}
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Current Conditions</Text>
-            <WeatherWidget weather={currentEvent.weather} />
-          </View>
-
           {/* Rig Setup */}
           <View style={styles.formCard}>
             <Text style={styles.formTitle}>Rig Setup</Text>
+
+            {/* Lure Type */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Lure Type</Text>
+              <View style={styles.chipRow}>
+                {LURE_TYPES.map((opt) => (
+                  <TouchableOpacity
+                    key={opt}
+                    style={[styles.chip, lureType === opt && styles.chipSelected]}
+                    onPress={() => setLureType(lureType === opt ? '' : opt)}
+                  >
+                    <Text style={[styles.chipText, lureType === opt && styles.chipTextSelected]}>
+                      {opt}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Lure Color */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Lure Color</Text>
+              <TextInput
+                style={styles.input}
+                value={lureColor}
+                onChangeText={setLureColor}
+                placeholder="e.g. Green/Chartreuse, Glow White"
+                placeholderTextColor="#4a5f7a"
+              />
+            </View>
 
             {/* Downrigger Depth */}
             <View style={styles.fieldGroup}>
@@ -396,30 +431,6 @@ export default function MateScreen() {
                 placeholder="e.g. 10"
                 placeholderTextColor="#4a5f7a"
                 keyboardType="numeric"
-              />
-            </View>
-
-            {/* Lure Type */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Lure Type *</Text>
-              <TextInput
-                style={styles.input}
-                value={lureType}
-                onChangeText={setLureType}
-                placeholder="e.g. Spoon, Flasher, Plug"
-                placeholderTextColor="#4a5f7a"
-              />
-            </View>
-
-            {/* Lure Color */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Lure Color</Text>
-              <TextInput
-                style={styles.input}
-                value={lureColor}
-                onChangeText={setLureColor}
-                placeholder="e.g. Green/Chartreuse, Glow White"
-                placeholderTextColor="#4a5f7a"
               />
             </View>
 
@@ -472,24 +483,6 @@ export default function MateScreen() {
               </View>
             </View>
 
-            {/* Side of Boat Landed */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Side of Boat Landed</Text>
-              <View style={styles.chipRow}>
-                {BOAT_SIDES.map((opt) => (
-                  <TouchableOpacity
-                    key={opt}
-                    style={[styles.chip, boatSide === opt && styles.chipSelected]}
-                    onPress={() => setBoatSide(boatSide === opt ? '' : opt)}
-                  >
-                    <Text style={[styles.chipText, boatSide === opt && styles.chipTextSelected]}>
-                      {opt}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
             {/* Line Type */}
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>Line Type</Text>
@@ -501,6 +494,60 @@ export default function MateScreen() {
                     onPress={() => setLineType(lineType === opt ? '' : opt)}
                   >
                     <Text style={[styles.chipText, lineType === opt && styles.chipTextSelected]}>
+                      {opt}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Direction of Waves */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Direction of Waves</Text>
+              <View style={styles.chipRow}>
+                {WAVE_DIRECTIONS.map((opt) => (
+                  <TouchableOpacity
+                    key={opt}
+                    style={[styles.chip, waveDirection === opt && styles.chipSelected]}
+                    onPress={() => setWaveDirection(waveDirection === opt ? '' : opt)}
+                  >
+                    <Text style={[styles.chipText, waveDirection === opt && styles.chipTextSelected]}>
+                      {opt}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Boat Direction */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Boat Direction</Text>
+              <View style={styles.chipRow}>
+                {COMPASS_DIRS.map((opt) => (
+                  <TouchableOpacity
+                    key={opt}
+                    style={[styles.chip, boatHeading === opt && styles.chipSelected]}
+                    onPress={() => setBoatHeading(boatHeading === opt ? '' : opt)}
+                  >
+                    <Text style={[styles.chipText, boatHeading === opt && styles.chipTextSelected]}>
+                      {opt}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Wind Direction */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Wind Direction</Text>
+              <View style={styles.chipRow}>
+                {COMPASS_DIRS.map((opt) => (
+                  <TouchableOpacity
+                    key={opt}
+                    style={[styles.chip, windDir === opt && styles.chipSelected]}
+                    onPress={() => setWindDir(windDir === opt ? '' : opt)}
+                  >
+                    <Text style={[styles.chipText, windDir === opt && styles.chipTextSelected]}>
                       {opt}
                     </Text>
                   </TouchableOpacity>
