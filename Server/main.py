@@ -42,11 +42,15 @@ LAKE_BOXES = [
     {"id": "ontario",      "latMin": 43.1, "latMax": 44.4, "lngMin": -79.9, "lngMax": -76.0},
 ]
 
+LAKE_ERDDAP_PREFIX = {
+    "georgian_bay": "LH", "huron": "LH", "superior": "LS",
+    "michigan": "LM", "erie": "LE", "ontario": "LO",
+}
+
 def determine_lake(lat, lng):
     for box in LAKE_BOXES:
         if box["latMin"] <= lat <= box["latMax"] and box["lngMin"] <= lng <= box["lngMax"]:
             return box["id"], STATIONS[box["id"]]["id"]
-    # fallback: nearest station
     nearest = min(STATIONS.items(), key=lambda kv: (kv[1]["lat"] - lat)**2 + (kv[1]["lng"] - lng)**2)
     return nearest[0], nearest[1]["id"]
 
@@ -61,10 +65,11 @@ def r1(n):
     except: return None
 
 def calc_moon_phase(date):
-    known_new = datetime(2000, 1, 6)
+    known_new = datetime(2000, 1, 6, 18, 14, 0)
     cycle = 29.53058867
-    days = (date - known_new).days % cycle
-    return round(days / cycle, 3)
+    days_since = (date - known_new).total_seconds() / 86400
+    phase = ((days_since % cycle) + cycle) % cycle / cycle
+    return round(phase, 2)
 
 def moon_phase_label(phase):
     if phase < 0.03 or phase > 0.97: return "New Moon"
@@ -78,11 +83,55 @@ def moon_phase_label(phase):
 
 def uv_label(uv):
     if uv is None: return None
-    if uv < 3: return "Low"
-    if uv < 6: return "Moderate"
-    if uv < 8: return "High"
-    if uv < 11: return "Very High"
+    if uv <= 2: return "Low"
+    if uv <= 5: return "Moderate"
+    if uv <= 7: return "High"
+    if uv <= 10: return "Very High"
     return "Extreme"
+
+def add_minutes_to_hhmm(hhmm, minutes):
+    try:
+        h, m = map(int, hhmm.split(":"))
+        total = ((h * 60 + m + minutes) % (24 * 60) + 24 * 60) % (24 * 60)
+        return f"{total // 60:02d}:{total % 60:02d}"
+    except:
+        return None
+
+def compute_solunar(astro, moon_phase):
+    upper_transit = astro.get("moonUpperTransit")
+    moonrise = astro.get("moonrise")
+    moonset = astro.get("moonset")
+
+    day_rating = None
+    if moon_phase is not None:
+        dist_new = min(moon_phase, 1 - moon_phase)
+        dist_full = abs(moon_phase - 0.5)
+        dist_nearest = min(dist_new, dist_full)
+        day_rating = round(6 - (dist_nearest / 0.25) * 4)
+
+    return {
+        "solunar_major_1_start": add_minutes_to_hhmm(upper_transit, -60) if upper_transit else None,
+        "solunar_major_1_stop":  add_minutes_to_hhmm(upper_transit,  60) if upper_transit else None,
+        "solunar_major_2_start": add_minutes_to_hhmm(upper_transit, 12 * 60 + 25 - 60) if upper_transit else None,
+        "solunar_major_2_stop":  add_minutes_to_hhmm(upper_transit, 12 * 60 + 25 + 60) if upper_transit else None,
+        "solunar_minor_1_start": add_minutes_to_hhmm(moonrise, -30) if moonrise else None,
+        "solunar_minor_1_stop":  add_minutes_to_hhmm(moonrise,  30) if moonrise else None,
+        "solunar_minor_2_start": add_minutes_to_hhmm(moonset,  -30) if moonset else None,
+        "solunar_minor_2_stop":  add_minutes_to_hhmm(moonset,   30) if moonset else None,
+        "solunar_day_rating": day_rating,
+    }
+
+def format_hour_12(iso_str):
+    try:
+        dt = datetime.fromisoformat(iso_str)
+        h = dt.hour
+        ampm = "AM" if h < 12 else "PM"
+        h12 = h % 12 or 12
+        return f"{h12} {ampm}"
+    except:
+        return iso_str
+
+# --- Async Fetchers ---
 
 async def fetch_open_meteo(client, lat, lng):
     try:
@@ -118,20 +167,12 @@ async def fetch_ndbc(client, station_id):
 
         wvht = mm("WVHT")
         return {
-            "wave_height_ft": r1(wvht * 3.28084) if wvht else None,
+            "wave_height_ft": r1(wvht * 3.28084) if wvht is not None else None,
             "wave_period_dominant_s": mm("DPD"),
             "wave_direction_deg": mm("MWD"),
             "sst_buoy_c": mm("WTMP"),
             "barometric_pressure_hpa": mm("PRES"),
         }
-    except:
-        return {}
-
-async def fetch_nominatim(client, lat, lng):
-    try:
-        url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lng}&zoom=14"
-        resp = await client.get(url, headers=USER_AGENT, timeout=10.0)
-        return resp.json()
     except:
         return {}
 
@@ -151,18 +192,152 @@ async def fetch_owm(client, lat, lng):
         return {}
 
 async def fetch_uv(client, lat, lng):
-    if not OWM_KEY:
-        return {}
     try:
-        url = f"https://api.openweathermap.org/data/2.5/uvi?lat={lat}&lon={lng}&appid={OWM_KEY}"
-        resp = await client.get(url, timeout=10.0)
+        url = (
+            f"https://api.open-meteo.com/v1/forecast"
+            f"?latitude={lat}&longitude={lng}&daily=uv_index_max&forecast_days=1&timezone=auto"
+        )
+        resp = await client.get(url, timeout=8.0)
         data = resp.json()
-        uv = data.get("value")
-        return {"uv_index": uv, "uv_index_label": uv_label(uv)}
+        uv = data.get("daily", {}).get("uv_index_max", [None])[0]
+        return {"uv_index": r1(uv), "uv_index_label": uv_label(uv)}
     except:
         return {}
 
-def build_previous_wind(om_data, current_hour):
+async def fetch_usno_astro(client, lat, lng, date):
+    try:
+        date_str = date.strftime("%Y-%m-%d")
+        # EST = UTC-5, EDT = UTC-4; use -4 for May-Oct
+        tz = -4
+        url = f"https://aa.usno.navy.mil/api/rstt/oneday?date={date_str}&coords={lat},{lng}&tz={tz}"
+        resp = await client.get(url, timeout=10.0, headers=USER_AGENT)
+        data = resp.json()
+        sun = data.get("properties", {}).get("data", {}).get("sundata", [])
+        moon = data.get("properties", {}).get("data", {}).get("moondata", [])
+
+        def pick(arr, phen):
+            for e in arr:
+                if e.get("phen") == phen:
+                    return e.get("time")
+            return None
+
+        return {
+            "sunrise": pick(sun, "Rise"),
+            "sunset": pick(sun, "Set"),
+            "moonrise": pick(moon, "Rise"),
+            "moonset": pick(moon, "Set"),
+            "moonUpperTransit": pick(moon, "Upper Transit"),
+        }
+    except:
+        return {}
+
+async def fetch_glerl_sst(client, lat, lng):
+    try:
+        lat0 = round(lat - 0.3, 4)
+        lat1 = round(lat + 0.3, 4)
+        lng0 = round(lng - 0.3, 4)
+        lng1 = round(lng + 0.3, 4)
+        url = (
+            f"https://apps.glerl.noaa.gov/erddap/griddap/GLSEA_ACSPO_GCS.json"
+            f"?sst[(last)][({lat0}):({lat1})][({lng0}):({lng1})]"
+        )
+        resp = await client.get(url, timeout=12.0, headers=USER_AGENT)
+        if not resp.is_success: return None
+        data = resp.json()
+        table = data.get("table", {})
+        col_names = table.get("columnNames", [])
+        sst_idx = col_names.index("sst") if "sst" in col_names else -1
+        if sst_idx == -1: return None
+        values = [r[sst_idx] for r in table.get("rows", []) if isinstance(r[sst_idx], (int, float)) and r[sst_idx] > -9]
+        if not values: return None
+        return r1(sum(values) / len(values))
+    except:
+        return None
+
+async def fetch_erddap_value(client, url, column_name):
+    try:
+        resp = await client.get(url, timeout=15.0, headers=USER_AGENT)
+        if not resp.is_success: return None
+        data = resp.json()
+        table = data.get("table", {})
+        col_names = table.get("columnNames", [])
+        idx = col_names.index(column_name) if column_name in col_names else -1
+        time_idx = col_names.index("time") if "time" in col_names else -1
+        if idx == -1: return None
+        rows = table.get("rows", [])
+        if time_idx >= 0:
+            rows = sorted(rows, key=lambda r: str(r[time_idx] or ""))
+        for row in reversed(rows):
+            v = row[idx]
+            if isinstance(v, (int, float)) and not math.isnan(v):
+                return r1(v)
+        return None
+    except:
+        return None
+
+async def fetch_chlorophyll_turbidity(client, lat, lng, lake_id):
+    prefix = LAKE_ERDDAP_PREFIX.get(lake_id, "LH")
+    lat0 = round(lat - 0.3, 4)
+    lat1 = round(lat + 0.3, 4)
+    lng0 = round(lng - 0.3, 4)
+    lng1 = round(lng + 0.3, 4)
+    since = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%dT00:00:00Z")
+    base = "https://apps.glerl.noaa.gov/erddap/griddap"
+
+    chl_url = f"{base}/{prefix}_CHL_NRT.json?Chlorophyll[({since}):(last)][({lat0}):({lat1})][({lng0}):({lng1})]"
+    turb_url = f"{base}/{prefix}_SM_VIIRS_Monthly_Avg.json?Suspended_Minerals[(last)][({lat0}):({lat1})][({lng0}):({lng1})]"
+
+    chl, turb = await asyncio.gather(
+        fetch_erddap_value(client, chl_url, "Chlorophyll"),
+        fetch_erddap_value(client, turb_url, "Suspended_Minerals"),
+        return_exceptions=True,
+    )
+    return {
+        "chlorophyll_ug_l": chl if isinstance(chl, (float, int, type(None))) else None,
+        "turbidity_mg_l": turb if isinstance(turb, (float, int, type(None))) else None,
+    }
+
+async def fetch_marine_currents(client, lat, lng):
+    try:
+        url = (
+            f"https://marine-api.open-meteo.com/v1/marine"
+            f"?latitude={lat}&longitude={lng}"
+            f"&hourly=ocean_current_velocity,ocean_current_direction&forecast_days=1"
+        )
+        resp = await client.get(url, timeout=10.0)
+        data = resp.json()
+        times = data.get("hourly", {}).get("time", [])
+        speeds = data.get("hourly", {}).get("ocean_current_velocity", [])
+        dirs = data.get("hourly", {}).get("ocean_current_direction", [])
+        now_hour = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+        idx = next((i for i, t in enumerate(times) if t >= now_hour.strftime("%Y-%m-%dT%H:00")), len(times) - 1)
+        speed_ms = speeds[idx] if idx < len(speeds) else None
+        direction = dirs[idx] if idx < len(dirs) else None
+        return {
+            "current_speed_knots": r1(speed_ms * 1.944) if speed_ms is not None else None,
+            "current_direction_deg": round(direction) if direction is not None else None,
+            "current_direction_label": degrees_to_cardinal(direction),
+        }
+    except:
+        return {"current_speed_knots": None, "current_direction_deg": None, "current_direction_label": None}
+
+async def fetch_nws_alerts(client, lat, lng):
+    try:
+        url = f"https://api.weather.gov/alerts/active?point={lat},{lng}&status=actual&message_type=alert"
+        resp = await client.get(url, timeout=8.0, headers=USER_AGENT)
+        if not resp.is_success:
+            return {"marine_warning_active": False, "marine_warning_text": None}
+        data = resp.json()
+        events = ["Small Craft Advisory", "Gale Warning", "Storm Warning", "Special Marine Warning", "Hurricane Force Wind Warning"]
+        match = next((f for f in data.get("features", []) if any(e in f.get("properties", {}).get("event", "") for e in events)), None)
+        return {
+            "marine_warning_active": bool(match),
+            "marine_warning_text": match["properties"]["headline"] if match else None,
+        }
+    except:
+        return {"marine_warning_active": False, "marine_warning_text": None}
+
+def build_previous_wind(om_data, now):
     try:
         hourly = om_data.get("hourly", {})
         times = hourly.get("time", [])
@@ -173,29 +348,36 @@ def build_previous_wind(om_data, current_hour):
         precip = hourly.get("precipitation", [])
         pressures = hourly.get("pressure_msl", [])
 
+        now_ms = now.replace(minute=0, second=0, microsecond=0).timestamp()
         result = []
         for i, t in enumerate(times):
-            if t < current_hour and i < len(speeds):
+            try:
+                t_ms = datetime.fromisoformat(t).timestamp()
+            except:
+                continue
+            if t_ms <= now_ms and i < len(speeds):
                 result.append({
-                    "time": t,
+                    "time": format_hour_12(t),
                     "speed_mph": r1(speeds[i]) if i < len(speeds) else None,
-                    "direction_deg": dirs[i] if i < len(dirs) else None,
+                    "direction_deg": round(dirs[i]) if i < len(dirs) and dirs[i] is not None else 0,
                     "direction_label": degrees_to_cardinal(dirs[i] if i < len(dirs) else None),
                     "temp_c": r1(temps[i]) if i < len(temps) else None,
-                    "cloud_cover_pct": clouds[i] if i < len(clouds) else None,
-                    "precipitation_mm": precip[i] if i < len(precip) else None,
-                    "pressure_hpa": r1(pressures[i]) if i < len(pressures) else None,
+                    "cloud_cover_pct": round(clouds[i]) if i < len(clouds) and clouds[i] is not None else None,
+                    "precipitation_mm": r1(precip[i]) if i < len(precip) else None,
+                    "pressure_hpa": round(pressures[i]) if i < len(pressures) and pressures[i] is not None else None,
                 })
-        return result[-6:] if result else []
+        return result[-24:]
     except:
         return []
 
-def calc_pressure_trend(om_data, current_hour):
+def calc_pressure_trend(om_data, now):
     try:
         hourly = om_data.get("hourly", {})
         times = hourly.get("time", [])
         pressures = hourly.get("pressure_msl", [])
-        past = [(t, p) for t, p in zip(times, pressures) if t < current_hour and p is not None]
+        now_ms = now.replace(minute=0, second=0, microsecond=0).timestamp()
+        past = [(datetime.fromisoformat(t).timestamp(), p) for t, p in zip(times, pressures) if p is not None]
+        past = [(ts, p) for ts, p in past if ts <= now_ms]
         if len(past) < 3: return None, None
         recent = past[-1][1]
         older = past[-3][1]
@@ -207,6 +389,7 @@ def calc_pressure_trend(om_data, current_hour):
     except:
         return None, None
 
+
 @app.get("/conditions")
 async def get_conditions(lat: float, lng: float):
     cache_key = f"{round(lat, 2)}_{round(lng, 2)}"
@@ -215,38 +398,45 @@ async def get_conditions(lat: float, lng: float):
 
     lake_id, station_id = determine_lake(lat, lng)
     now = datetime.utcnow()
-    current_hour = now.strftime("%Y-%m-%dT%H:00")
 
     async with httpx.AsyncClient() as client:
-        om_data, ndbc_data, nom_data, owm_data, uv_data = await asyncio.gather(
+        (om_data, ndbc_data, owm_data, uv_data,
+         astro_data, glerl_sst, chl_turb, currents, alerts) = await asyncio.gather(
             fetch_open_meteo(client, lat, lng),
             fetch_ndbc(client, station_id),
-            fetch_nominatim(client, lat, lng),
             fetch_owm(client, lat, lng),
             fetch_uv(client, lat, lng),
+            fetch_usno_astro(client, lat, lng, now),
+            fetch_glerl_sst(client, lat, lng),
+            fetch_chlorophyll_turbidity(client, lat, lng, lake_id),
+            fetch_marine_currents(client, lat, lng),
+            fetch_nws_alerts(client, lat, lng),
             return_exceptions=True,
         )
 
-    def safe(d): return d if isinstance(d, dict) else {}
+    def safe(d, fallback=None): return d if isinstance(d, (dict, list)) else (fallback or {})
     om = safe(om_data)
     ndbc = safe(ndbc_data)
     owm = safe(owm_data)
     uv = safe(uv_data)
-    nom = safe(nom_data)
+    astro = safe(astro_data)
+    sst_sat = glerl_sst if isinstance(glerl_sst, (float, int, type(None))) else None
+    chl = safe(chl_turb)
+    cur = safe(currents)
+    warn = safe(alerts)
 
     c = om.get("current", {})
-    pressure_tendency, pressure_trend = calc_pressure_trend(om, current_hour)
-    prev_wind = build_previous_wind(om, current_hour)
+    pressure_tendency, pressure_trend = calc_pressure_trend(om, now)
+    prev_wind = build_previous_wind(om, now)
     moon_phase = calc_moon_phase(now)
+    solunar = compute_solunar(astro, moon_phase)
 
     dew_point = None
     temp = c.get("temperature_2m")
     humidity = c.get("relative_humidity_2m")
     if temp is not None and humidity is not None:
-        try:
-            dew_point = r1(temp - ((100 - humidity) / 5))
-        except:
-            pass
+        try: dew_point = r1(temp - ((100 - humidity) / 5))
+        except: pass
 
     weather_code = c.get("weather_code")
     precip_type = None
@@ -277,28 +467,20 @@ async def get_conditions(lat: float, lng: float):
         "wave_height_ft": ndbc.get("wave_height_ft"),
         "wave_period_dominant_s": ndbc.get("wave_period_dominant_s"),
         "wave_direction_deg": ndbc.get("wave_direction_deg"),
-        "current_speed_knots": None,
-        "current_direction_deg": None,
-        "current_direction_label": None,
+        "current_speed_knots": cur.get("current_speed_knots"),
+        "current_direction_deg": cur.get("current_direction_deg"),
+        "current_direction_label": cur.get("current_direction_label"),
         "sst_buoy_c": ndbc.get("sst_buoy_c"),
-        "sst_satellite_c": None,
-        "chlorophyll_ug_l": None,
-        "turbidity_mg_l": None,
+        "sst_satellite_c": sst_sat,
+        "chlorophyll_ug_l": chl.get("chlorophyll_ug_l"),
+        "turbidity_mg_l": chl.get("turbidity_mg_l"),
         "moon_phase_value": moon_phase,
         "moon_phase_label": moon_phase_label(moon_phase),
-        "moonrise_time": None,
-        "moonset_time": None,
-        "sunrise_time": None,
-        "sunset_time": None,
-        "solunar_major_1_start": None,
-        "solunar_major_1_stop": None,
-        "solunar_major_2_start": None,
-        "solunar_major_2_stop": None,
-        "solunar_minor_1_start": None,
-        "solunar_minor_1_stop": None,
-        "solunar_minor_2_start": None,
-        "solunar_minor_2_stop": None,
-        "solunar_day_rating": None,
+        "moonrise_time": astro.get("moonrise"),
+        "moonset_time": astro.get("moonset"),
+        "sunrise_time": astro.get("sunrise"),
+        "sunset_time": astro.get("sunset"),
+        **solunar,
         "humidity_pct": humidity,
         "feels_like_c": r1(c.get("apparent_temperature")),
         "dew_point_c": dew_point,
@@ -306,8 +488,8 @@ async def get_conditions(lat: float, lng: float):
         "uv_index": uv.get("uv_index"),
         "uv_index_label": uv.get("uv_index_label"),
         "previous_wind": prev_wind,
-        "marine_warning_active": False,
-        "marine_warning_text": None,
+        "marine_warning_active": warn.get("marine_warning_active", False),
+        "marine_warning_text": warn.get("marine_warning_text"),
         "atmospheric_source": "owm" if OWM_KEY else "ndbc",
     }
 
