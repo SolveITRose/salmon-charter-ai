@@ -12,3 +12,7 @@ node_modules/
 dist/
 .expo/web/cache/
 .claude/
+server/venv/
+server/.env
+node_modules/
+.expo/
