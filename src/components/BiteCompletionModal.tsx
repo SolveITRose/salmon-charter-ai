@@ -28,6 +28,10 @@ const RIG_POSITIONS = ['Main', 'Slider'];
 const LINE_TYPES = ['Mono', 'Braid', 'Leadcore', 'Fluorocarbon'];
 const WAVE_DIRECTIONS = ['Stern', 'Port', 'Starboard', 'Bow'];
 const COMPASS_DIRS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+const TARGET_SPECIES = ['Chinook', 'Coho', 'Rainbow', 'Lake Trout'];
+const BALL_WEIGHTS = ['8', '10', '12', '14', '15'];
+const WATER_CLARITY = ['Clear', 'Slightly stained', 'Green', 'Murky'];
+const SPREAD_POSITIONS = ['Port inner', 'Port outer', 'Stbd inner', 'Stbd outer', 'Board', 'Flatline'];
 
 interface Props {
   event: CatchEvent;
@@ -61,6 +65,12 @@ export default function BiteCompletionModal({ event, visible, onComplete, onClos
   const [waveDirection, setWaveDirection] = useState(event.setup.waveDirection || '');
   const [boatHeading, setBoatHeading] = useState(event.setup.boatHeading || '');
   const [windDir, setWindDir] = useState(event.setup.windDir || '');
+  const [targetSpecies, setTargetSpecies] = useState(event.setup.targetSpecies || '');
+  const [flasherColor, setFlasherColor] = useState(event.setup.flasherColor || '');
+  const [leadLength, setLeadLength] = useState(event.setup.leadLengthIn ? String(event.setup.leadLengthIn) : '');
+  const [ballWeight, setBallWeight] = useState(event.setup.ballWeightLbs ? String(event.setup.ballWeightLbs) : '');
+  const [waterClarity, setWaterClarity] = useState(event.setup.waterClarity || '');
+  const [spreadPosition, setSpreadPosition] = useState(event.setup.spreadPosition || '');
   const [voiceAudioPath, setVoiceAudioPath] = useState('');
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const [voiceDuration, setVoiceDuration] = useState(0);
@@ -111,6 +121,12 @@ export default function BiteCompletionModal({ event, visible, onComplete, onClos
         waveDirection: waveDirection || undefined,
         boatHeading: boatHeading || undefined,
         windDir: windDir || undefined,
+        targetSpecies: targetSpecies || undefined,
+        flasherColor: lureType === 'Flasher fly' ? (flasherColor.trim() || undefined) : undefined,
+        leadLengthIn: lureType === 'Flasher fly' ? (parseFloat(leadLength) || undefined) : undefined,
+        ballWeightLbs: ballWeight ? parseFloat(ballWeight) : undefined,
+        waterClarity: waterClarity || undefined,
+        spreadPosition: spreadPosition || undefined,
       };
 
       let updatedEvent: CatchEvent = {
@@ -170,7 +186,8 @@ export default function BiteCompletionModal({ event, visible, onComplete, onClos
   }, [
     event, photoUri, lureType, lureColor, downriggerDepth, backFromBall,
     trollingSpeed, rigType, rigPosition, lineType, waveDirection, boatHeading,
-    windDir, voiceAudioPath, voiceTranscript, voiceDuration, onComplete,
+    windDir, targetSpecies, flasherColor, leadLength, ballWeight, waterClarity,
+    spreadPosition, voiceAudioPath, voiceTranscript, voiceDuration, onComplete,
   ]);
 
   return (
@@ -229,6 +246,21 @@ export default function BiteCompletionModal({ event, visible, onComplete, onClos
               <Text style={styles.cardTitle}>Rig Setup</Text>
 
               <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Target Species</Text>
+                <View style={styles.chipRow}>
+                  {TARGET_SPECIES.map((opt) => (
+                    <TouchableOpacity
+                      key={opt}
+                      style={[styles.chip, targetSpecies === opt && styles.chipSelected]}
+                      onPress={() => setTargetSpecies(targetSpecies === opt ? '' : opt)}
+                    >
+                      <Text style={[styles.chipText, targetSpecies === opt && styles.chipTextSelected]}>{opt}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.fieldGroup}>
                 <Text style={styles.fieldLabel}>Lure Type</Text>
                 <View style={styles.chipRow}>
                   {LURE_TYPES.map((opt) => (
@@ -254,6 +286,32 @@ export default function BiteCompletionModal({ event, visible, onComplete, onClos
                 />
               </View>
 
+              {lureType === 'Flasher fly' && (
+                <>
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>Flasher Color / Pattern</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={flasherColor}
+                      onChangeText={setFlasherColor}
+                      placeholder="e.g. Green/Glow, UV Blue"
+                      placeholderTextColor="#4a5f7a"
+                    />
+                  </View>
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>Lead Length — Flasher to Fly (inches)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={leadLength}
+                      onChangeText={setLeadLength}
+                      placeholder="e.g. 24"
+                      placeholderTextColor="#4a5f7a"
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </>
+              )}
+
               <View style={styles.fieldGroup}>
                 <Text style={styles.fieldLabel}>Downrigger Depth (feet)</Text>
                 <TextInput
@@ -264,6 +322,21 @@ export default function BiteCompletionModal({ event, visible, onComplete, onClos
                   placeholderTextColor="#4a5f7a"
                   keyboardType="numeric"
                 />
+              </View>
+
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Ball Weight (lbs)</Text>
+                <View style={styles.chipRow}>
+                  {BALL_WEIGHTS.map((opt) => (
+                    <TouchableOpacity
+                      key={opt}
+                      style={[styles.chip, ballWeight === opt && styles.chipSelected]}
+                      onPress={() => setBallWeight(ballWeight === opt ? '' : opt)}
+                    >
+                      <Text style={[styles.chipText, ballWeight === opt && styles.chipTextSelected]}>{opt}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
 
               <View style={styles.fieldGroup}>
@@ -321,6 +394,21 @@ export default function BiteCompletionModal({ event, visible, onComplete, onClos
               </View>
 
               <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Spread Position</Text>
+                <View style={styles.chipRow}>
+                  {SPREAD_POSITIONS.map((opt) => (
+                    <TouchableOpacity
+                      key={opt}
+                      style={[styles.chip, spreadPosition === opt && styles.chipSelected]}
+                      onPress={() => setSpreadPosition(spreadPosition === opt ? '' : opt)}
+                    >
+                      <Text style={[styles.chipText, spreadPosition === opt && styles.chipTextSelected]}>{opt}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.fieldGroup}>
                 <Text style={styles.fieldLabel}>Line Type</Text>
                 <View style={styles.chipRow}>
                   {LINE_TYPES.map((opt) => (
@@ -330,6 +418,21 @@ export default function BiteCompletionModal({ event, visible, onComplete, onClos
                       onPress={() => setLineType(lineType === opt ? '' : opt)}
                     >
                       <Text style={[styles.chipText, lineType === opt && styles.chipTextSelected]}>{opt}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Water Clarity</Text>
+                <View style={styles.chipRow}>
+                  {WATER_CLARITY.map((opt) => (
+                    <TouchableOpacity
+                      key={opt}
+                      style={[styles.chip, waterClarity === opt && styles.chipSelected]}
+                      onPress={() => setWaterClarity(waterClarity === opt ? '' : opt)}
+                    >
+                      <Text style={[styles.chipText, waterClarity === opt && styles.chipTextSelected]}>{opt}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>

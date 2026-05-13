@@ -40,6 +40,12 @@ export interface SetupData {
   waveDirection?: string;    // 'Stern' | 'Port' | 'Starboard' | 'Bow'
   boatHeading?: string;      // compass direction e.g. 'NW'
   windDir?: string;          // compass direction e.g. 'SW'
+  targetSpecies?: string;    // 'Chinook' | 'Coho' | 'Rainbow' | 'Lake Trout'
+  flasherColor?: string;     // color/pattern of flasher, e.g. "Green/Glow"
+  leadLengthIn?: number;     // inches from flasher to fly/hoochie
+  ballWeightLbs?: number;    // downrigger ball weight in lbs
+  waterClarity?: string;     // 'Clear' | 'Slightly stained' | 'Green' | 'Murky'
+  spreadPosition?: string;   // which rigger in the spread, e.g. 'Port inner'
 }
 
 export interface VoiceNote {
