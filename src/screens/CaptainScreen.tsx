@@ -16,10 +16,11 @@ import { CatchEvent, FishFinderData, GpsData, GpsMark, MarkType, WeatherData } f
 import { getCurrentPosition } from '../services/gpsService';
 import { fetchWeatherData, fetchWindHistory, fetchPressureHistory } from '../services/weatherService';
 import { computeHydroScore } from '../agents/hydrodynamicAgent';
-import { insertEvent, updateEvent, insertMark, updateMark } from '../storage/localDB';
-import { formatEventCode, celsiusToFahrenheit } from '../utils/formatters';
+import { insertEvent, updateEvent, insertMark, updateMark, getPendingBiteEvents } from '../storage/localDB';
+import { formatEventCode, celsiusToFahrenheit, formatTimestamp } from '../utils/formatters';
 import WeatherWaterCard from '../components/WeatherWaterCard';
 import FishFinderModal from '../components/FishFinderModal';
+import BiteCompletionModal from '../components/BiteCompletionModal';
 import { fetchTripConditions, fetchPreyData, TripConditions } from '../services/weatherWaterService';
 import { saveTripConditions } from '../storage/localDB';
 import { fetchWaterBodyInfo, WaterBodyInfo } from '../services/waterBodyService';
@@ -68,14 +69,23 @@ export default function CaptainScreen() {
   const [fishOnLoading, setFishOnLoading] = useState(false);
   const [fishOnMessage, setFishOnMessage] = useState<string | null>(null);
   const [fishFinderEvent, setFishFinderEvent] = useState<CatchEvent | null>(null);
+  const [pendingBites, setPendingBites] = useState<CatchEvent[]>([]);
+  const [selectedBite, setSelectedBite] = useState<CatchEvent | null>(null);
+  const [completionModalVisible, setCompletionModalVisible] = useState(false);
   const [markLoading, setMarkLoading] = useState<MarkType | null>(null);
   const [markMessage, setMarkMessage] = useState<string | null>(null);
   const [otherModalVisible, setOtherModalVisible] = useState(false);
   const [otherNote, setOtherNote] = useState('');
   const [pendingMarkForScan, setPendingMarkForScan] = useState<GpsMark | null>(null);
 
+  const loadPendingBites = useCallback(async () => {
+    const bites = await getPendingBiteEvents();
+    setPendingBites(bites);
+  }, []);
+
   useEffect(() => {
     loadTripConditions();
+    loadPendingBites();
   }, []);
 
   useEffect(() => {
@@ -203,6 +213,7 @@ export default function CaptainScreen() {
 
       await insertEvent(event);
       setFishFinderEvent(event);
+      loadPendingBites();
     } catch (error) {
       console.error('[Captain] handleFishOn error:', error);
       setFishOnMessage('Failed to record bite. Try again.');
@@ -210,7 +221,13 @@ export default function CaptainScreen() {
       setFishOnLoading(false);
       setFishOnSide(null);
     }
-  }, []);
+  }, [loadPendingBites]);
+
+  const handleBiteComplete = useCallback(() => {
+    setCompletionModalVisible(false);
+    setSelectedBite(null);
+    loadPendingBites();
+  }, [loadPendingBites]);
 
   const handleFishFinderSave = useCallback(async (data: FishFinderData) => {
     if (!fishFinderEvent) return;
@@ -221,14 +238,14 @@ export default function CaptainScreen() {
       console.error('[Captain] handleFishFinderSave error:', err);
     } finally {
       setFishFinderEvent(null);
-      setFishOnMessage(`${fishFinderEvent.eventCode} — conditions captured! Mate can now join to add photo.`);
+      setFishOnMessage(`${fishFinderEvent.eventCode} — conditions captured! Bite logged — tap the card below to complete.`);
     }
   }, [fishFinderEvent]);
 
   const handleFishFinderSkip = useCallback(() => {
     const code = fishFinderEvent?.eventCode ?? '';
     setFishFinderEvent(null);
-    setFishOnMessage(`${code} — conditions captured! Mate can now join to add photo.`);
+    setFishOnMessage(`${code} — conditions captured! Bite logged — tap the card below to complete.`);
   }, [fishFinderEvent]);
 
   const handleMark = useCallback(async (type: MarkType, notes?: string) => {
@@ -392,6 +409,38 @@ export default function CaptainScreen() {
         <TouchableOpacity style={styles.fishOnBanner} onPress={() => setFishOnMessage(null)} activeOpacity={0.8}>
           <Text style={styles.fishOnBannerText}>🎣 {fishOnMessage}</Text>
         </TouchableOpacity>
+      )}
+
+      {/* ── Pending Catches ── */}
+      {pendingBites.length > 0 && (
+        <View style={styles.pendingSection}>
+          <Text style={styles.pendingSectionTitle}>Pending ({pendingBites.length})</Text>
+          {pendingBites.map((bite) => (
+            <TouchableOpacity
+              key={bite.id}
+              style={styles.pendingCard}
+              onPress={() => { setSelectedBite(bite); setCompletionModalVisible(true); }}
+              activeOpacity={0.8}
+            >
+              <View style={styles.pendingCardLeft}>
+                <Text style={styles.pendingCode}>{bite.eventCode}</Text>
+                <Text style={styles.pendingMeta}>
+                  {bite.setup.boatSide} · {formatTimestamp(bite.biteTimestamp ?? bite.timestamp)}
+                </Text>
+              </View>
+              <Text style={styles.pendingAction}>Add photo + rig ›</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      {selectedBite && (
+        <BiteCompletionModal
+          event={selectedBite}
+          visible={completionModalVisible}
+          onComplete={handleBiteComplete}
+          onClose={() => { setCompletionModalVisible(false); setSelectedBite(null); }}
+        />
       )}
 
       {/* ── Mark Location ── */}
@@ -701,6 +750,48 @@ const styles = StyleSheet.create({
     color: '#00e676',
     fontSize: 13,
     textAlign: 'center',
+    fontWeight: '600',
+  },
+  pendingSection: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+  },
+  pendingSectionTitle: {
+    color: '#ffab00',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 6,
+  },
+  pendingCard: {
+    backgroundColor: '#1a2a10',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: '#2e5a2e',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pendingCardLeft: {
+    flex: 1,
+  },
+  pendingCode: {
+    color: '#69f0ae',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  pendingMeta: {
+    color: '#8899aa',
+    fontSize: 12,
+  },
+  pendingAction: {
+    color: '#ffab00',
+    fontSize: 13,
     fontWeight: '600',
   },
   pendingBitesBar: {

@@ -45,16 +45,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="mate"
-        options={{
-          title: 'Mate',
-          headerTitle: '1st Mate Log',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="fish" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="shore"
         options={{
           title: 'Shore',
