@@ -79,6 +79,38 @@ function turbLabel(sm: number): string {
   return 'Very clear';
 }
 
+function foodChainSummary(chl: number | null, turb: number | null): string {
+  if (chl === null && turb === null) return 'Satellite data unavailable for this area.';
+
+  const parts: string[] = [];
+
+  if (chl !== null) {
+    if (chl >= 2 && chl <= 8) {
+      parts.push(`Chlorophyll is at ${chl} µg/L — healthy phytoplankton levels. Good base for the food chain.`);
+    } else if (chl > 8) {
+      parts.push(`Chlorophyll is elevated at ${chl} µg/L — bloom conditions. Can concentrate baitfish in patches.`);
+    } else if (chl >= 0.5) {
+      parts.push(`Chlorophyll at ${chl} µg/L — lower than peak productivity, but the food chain is active.`);
+    } else {
+      parts.push(`Chlorophyll at ${chl} µg/L — very low. Sparse food chain conditions.`);
+    }
+  }
+
+  if (turb !== null) {
+    if (turb >= 0.01 && turb <= 0.08) {
+      parts.push(`Slight turbidity (${turb} mg/L) — typical smelt and baitfish habitat. Fish are likely feeding.`);
+    } else if (turb > 0.08 && turb <= 0.15) {
+      parts.push(`Moderate turbidity (${turb} mg/L) — some suspended particles. Baitfish may be scattered.`);
+    } else if (turb > 0.15) {
+      parts.push(`High turbidity (${turb} mg/L) — murky conditions. Baitfish feeding activity may be reduced.`);
+    } else {
+      parts.push(`Very clear water (${turb} mg/L) — low turbidity. Open water, baitfish may be deeper.`);
+    }
+  }
+
+  return parts.join(' ');
+}
+
 function trendArrow(trend: TripConditions['pressure_trend']): string {
   if (trend === 'rising')  return ' ↑';
   if (trend === 'falling') return ' ↓';
@@ -227,10 +259,6 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
           value={conditions.wind_gust_mph !== null ? `${Math.round(conditions.wind_gust_mph * 1.60934)} km/h` : '—'}
         />
         <Row
-          label="Conditions"
-          value={dash(conditions.conditions_text)}
-        />
-        <Row
           label="Air Temp"
           value={cToF(conditions.air_temp_c)}
         />
@@ -253,10 +281,6 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
         <Row
           label="Precipitation"
           value={conditions.precipitation_mm !== null ? `${Math.round(conditions.precipitation_mm)} mm` : '—'}
-        />
-        <Row
-          label="Visibility"
-          value={conditions.visibility_km !== null ? `${Math.round(conditions.visibility_km)} km` : '—'}
         />
         <Row
           label="UV Index"
@@ -343,22 +367,9 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
 
       {/* 4. Food Chain */}
       <Section title="Food Chain (Satellite)">
-        <Row
-          label="Chlorophyll-a"
-          value={
-            conditions.chlorophyll_ug_l !== null
-              ? `${conditions.chlorophyll_ug_l} µg/L · ${chlLabel(conditions.chlorophyll_ug_l)}`
-              : 'Satellite data unavailable'
-          }
-        />
-        <Row
-          label="Turbidity"
-          value={
-            conditions.turbidity_mg_l !== null
-              ? `${conditions.turbidity_mg_l} mg/L · ${turbLabel(conditions.turbidity_mg_l)}`
-              : 'No data'
-          }
-        />
+        <Text style={styles.foodChainText}>
+          {foodChainSummary(conditions.chlorophyll_ug_l, conditions.turbidity_mg_l)}
+        </Text>
       </Section>
 
       {/* 5. Lunar */}
@@ -566,6 +577,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 16,
     paddingHorizontal: 14,
+  },
+  foodChainText: {
+    color: '#ffffff',
+    fontSize: 13,
+    lineHeight: 20,
+    paddingVertical: 4,
   },
   glerlLink: {
     marginTop: 6,

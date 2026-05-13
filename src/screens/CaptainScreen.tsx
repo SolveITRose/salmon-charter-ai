@@ -25,6 +25,13 @@ import { saveTripConditions } from '../storage/localDB';
 import { fetchWaterBodyInfo, WaterBodyInfo } from '../services/waterBodyService';
 import { getFMZInfo, FMZInfo } from '../data/ontarioFMZ';
 
+function regulationSeason(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const startYear = now.getMonth() >= 3 ? year : year - 1; // April (month 3) starts new season
+  return `${startYear}–${(startYear + 1).toString().slice(2)}`;
+}
+
 function cToF(c: number | null): string {
   if (c === null) return '—';
   return `${Math.round(celsiusToFahrenheit(c))}°F`;
@@ -521,7 +528,7 @@ export default function CaptainScreen() {
         <View style={styles.regsCard}>
           <View style={styles.regsHeader}>
             <Text style={styles.regsTitle}>{`FMZ ${fmzInfo.zone}  ·  ${fmzInfo.name}`}</Text>
-            <Text style={styles.regsSource}>2024–25</Text>
+            <Text style={styles.regsSource}>{regulationSeason()}</Text>
           </View>
           {fmzInfo.rules.length > 0 ? (
             <>

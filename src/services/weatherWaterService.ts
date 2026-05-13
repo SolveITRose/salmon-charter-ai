@@ -787,12 +787,11 @@ export async function fetchTripConditions(
   lng: number,
   date: string,
 ): Promise<TripConditions> {
-  const { lakeId, stationId, nearestBuoyKm } = determineLake(lat, lng);
-
-  // Skip NDBC if the nearest buoy is more than 200 km away — buoy data that
-  // far from the user's location is meaningless. OWM atmospheric is GPS-based
-  // and works anywhere in the world.
-  const skipNDBC = nearestBuoyKm > 200;
+  // Always use Georgian Bay buoy (Western Islands / Christian Island / Collingwood area)
+  // regardless of GPS position — this app is for Georgian Bay salmon fishing.
+  const lakeId = 'georgian_bay';
+  const stationId = STATIONS.georgian_bay.id;
+  const skipNDBC = false;
 
   const [ndbcRaw, owm, omAtmo, glerl, prey, nws, uv, prevWind, astro, currents, pressureTrend] = await Promise.all([
     skipNDBC ? Promise.resolve(null) : fetchNDBC(stationId),
