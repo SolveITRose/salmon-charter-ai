@@ -29,6 +29,42 @@ function degreesToCardinal(deg: number): string {
   return dirs[Math.round(deg / 45) % 8];
 }
 
+interface WindRun {
+  time: string;
+  avgSpeedKmh: number;
+  label: string;
+  durationHours: number;
+  avgTempC: number | null;
+  avgCloud: number | null;
+  avgPrecip: number | null;
+}
+
+function groupWindRuns(winds: NonNullable<TripConditions['previous_wind']>): WindRun[] {
+  const runs: WindRun[] = [];
+  let i = 0;
+  while (i < winds.length) {
+    const label = winds[i].direction_label;
+    let j = i;
+    while (j < winds.length && winds[j].direction_label === label) j++;
+    const group = winds.slice(i, j);
+    const avgSpeedKmh = Math.ceil(group.reduce((s, w) => s + w.speed_mph * 1.60934, 0) / group.length);
+    const temps = group.map(w => w.temp_c).filter((t): t is number => t !== null);
+    const clouds = group.map(w => w.cloud_cover_pct).filter((c): c is number => c !== null);
+    const precips = group.map(w => w.precipitation_mm).filter((p): p is number => p !== null && p > 0);
+    runs.push({
+      time: group[0].time,
+      avgSpeedKmh,
+      label,
+      durationHours: group.length,
+      avgTempC: temps.length > 0 ? temps.reduce((s, t) => s + t, 0) / temps.length : null,
+      avgCloud: clouds.length > 0 ? Math.round(clouds.reduce((s, c) => s + c, 0) / clouds.length) : null,
+      avgPrecip: precips.length > 0 ? Math.round(precips.reduce((s, p) => s + p, 0) / precips.length) : null,
+    });
+    i = j;
+  }
+  return runs.reverse();
+}
+
 function dash(v: string | number | null | undefined): string {
   if (v === null || v === undefined) return '—';
   return String(v);
@@ -248,23 +284,25 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
 
       {/* 1. Weather History */}
       {conditions.previous_wind && conditions.previous_wind.length > 0 && (
-        <Section title={coordsLabel ? `Weather History (last 24h, ${coordsLabel})` : 'Weather History (last 24h)'}>
+        <Section title={coordsLabel ? `Weather History (last 72h, ${coordsLabel})` : 'Weather History (last 72h)'}>
           <View style={styles.windHistoryHeader}>
             <Text style={[styles.windHistoryCol, styles.windHistoryColTime]}>Time</Text>
             <Text style={styles.windHistoryCol}>km/h</Text>
             <Text style={styles.windHistoryCol}>Hdg</Text>
+            <Text style={[styles.windHistoryCol, styles.windHistoryColDur]}>Dur</Text>
             <Text style={styles.windHistoryCol}>Temp</Text>
             <Text style={styles.windHistoryCol}>Cloud</Text>
             <Text style={styles.windHistoryCol}>Precip</Text>
           </View>
-          {[...conditions.previous_wind].reverse().map((w, i) => (
+          {groupWindRuns(conditions.previous_wind).map((run, i) => (
             <View key={i} style={styles.windHistoryRow}>
-              <Text style={[styles.windHistoryCol, styles.windHistoryColTime, styles.windHistoryVal]}>{w.time}</Text>
-              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{Math.round(w.speed_mph * 1.60934)}</Text>
-              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.direction_deg}°{'\n'}{w.direction_label}</Text>
-              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.temp_c != null ? cToF(w.temp_c) : '—'}</Text>
-              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.cloud_cover_pct != null ? `${w.cloud_cover_pct}%` : '—'}</Text>
-              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{w.precipitation_mm != null && w.precipitation_mm > 0 ? `${Math.round(w.precipitation_mm)}mm` : '—'}</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryColTime, styles.windHistoryVal]}>{run.time}</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{run.avgSpeedKmh}</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{run.label}</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryColDur, styles.windHistoryVal]}>{run.durationHours}h</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{run.avgTempC != null ? cToF(run.avgTempC) : '—'}</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{run.avgCloud != null ? `${run.avgCloud}%` : '—'}</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{run.avgPrecip != null ? `${run.avgPrecip}mm` : '—'}</Text>
             </View>
           ))}
         </Section>
@@ -510,6 +548,9 @@ const styles = StyleSheet.create({
   },
   windHistoryColTime: {
     flex: 1.2,
+  },
+  windHistoryColDur: {
+    flex: 0.7,
   },
   windHistoryVal: {
     color: '#ffffff',

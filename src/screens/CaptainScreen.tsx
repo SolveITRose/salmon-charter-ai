@@ -72,6 +72,7 @@ export default function CaptainScreen() {
   const [pendingBites, setPendingBites] = useState<CatchEvent[]>([]);
   const [selectedBite, setSelectedBite] = useState<CatchEvent | null>(null);
   const [completionModalVisible, setCompletionModalVisible] = useState(false);
+  const [pendingExpanded, setPendingExpanded] = useState(false);
   const [markLoading, setMarkLoading] = useState<MarkType | null>(null);
   const [markMessage, setMarkMessage] = useState<string | null>(null);
   const [otherModalVisible, setOtherModalVisible] = useState(false);
@@ -422,8 +423,12 @@ export default function CaptainScreen() {
       {/* ── Pending Catches ── */}
       {pendingBites.length > 0 && (
         <View style={styles.pendingSection}>
-          <Text style={styles.pendingSectionTitle}>Pending ({pendingBites.length})</Text>
-          {pendingBites.map((bite) => (
+          <TouchableOpacity onPress={() => setPendingExpanded(e => !e)} activeOpacity={0.7}>
+            <Text style={styles.pendingSectionTitle}>
+              {pendingExpanded ? '▼' : '▶'} Pending ({pendingBites.length})
+            </Text>
+          </TouchableOpacity>
+          {pendingExpanded && pendingBites.map((bite) => (
             <TouchableOpacity
               key={bite.id}
               style={styles.pendingCard}

@@ -127,7 +127,8 @@ def format_hour_12(iso_str):
         h = dt.hour
         ampm = "AM" if h < 12 else "PM"
         h12 = h % 12 or 12
-        return f"{h12} {ampm}"
+        day = dt.strftime("%a")
+        return f"{day} {h12}{ampm}"
     except:
         return iso_str
 
@@ -141,7 +142,7 @@ async def fetch_open_meteo(client, lat, lng):
             f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,"
             f"cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code"
             f"&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,precipitation,cloud_cover,pressure_msl"
-            f"&wind_speed_unit=mph&forecast_days=1&past_days=1&timezone=auto"
+            f"&wind_speed_unit=mph&forecast_days=1&past_days=3&timezone=auto"
         )
         resp = await client.get(url, timeout=10.0)
         return resp.json()
@@ -367,7 +368,7 @@ def build_previous_wind(om_data, now_utc):
                     "precipitation_mm": r1(precip[i]) if i < len(precip) else None,
                     "pressure_hpa": round(pressures[i]) if i < len(pressures) and pressures[i] is not None else None,
                 })
-        return result[-24:]
+        return result[-72:]
     except:
         return []
 
