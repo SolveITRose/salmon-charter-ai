@@ -24,35 +24,11 @@ USER_AGENT = {"User-Agent": "SalmonCharterAI/1.0 (brianrose75@gmail.com)"}
 
 env_cache = TTLCache(maxsize=100, ttl=300)
 
-STATIONS = {
-    "superior":     {"id": "45001", "lat": 48.068, "lng": -86.603},
-    "michigan":     {"id": "45007", "lat": 45.022, "lng": -87.105},
-    "huron":        {"id": "45003", "lat": 45.349, "lng": -82.836},
-    "georgian_bay": {"id": "45143", "lat": 44.792, "lng": -80.277},
-    "erie":         {"id": "45005", "lat": 41.680, "lng": -82.390},
-    "ontario":      {"id": "45012", "lat": 43.618, "lng": -77.394},
-}
-
-LAKE_BOXES = [
-    {"id": "georgian_bay", "latMin": 44.5, "latMax": 46.0, "lngMin": -81.3, "lngMax": -79.5},
-    {"id": "superior",     "latMin": 46.2, "latMax": 49.1, "lngMin": -92.2, "lngMax": -84.3},
-    {"id": "michigan",     "latMin": 41.6, "latMax": 46.1, "lngMin": -87.6, "lngMax": -84.7},
-    {"id": "huron",        "latMin": 43.0, "latMax": 46.4, "lngMin": -84.8, "lngMax": -79.4},
-    {"id": "erie",         "latMin": 41.3, "latMax": 43.0, "lngMin": -83.5, "lngMax": -78.8},
-    {"id": "ontario",      "latMin": 43.1, "latMax": 44.4, "lngMin": -79.9, "lngMax": -76.0},
+GB_BUOYS = [
+    {"id": "45143", "lat": 44.940, "lng": -80.627, "name": "South Georgian Bay"},
+    {"id": "45137", "lat": 45.540, "lng": -81.020, "name": "Central Georgian Bay"},
+    {"id": "45135", "lat": 45.800, "lng": -80.400, "name": "Northern Georgian Bay"},
 ]
-
-LAKE_ERDDAP_PREFIX = {
-    "georgian_bay": "LH", "huron": "LH", "superior": "LS",
-    "michigan": "LM", "erie": "LE", "ontario": "LO",
-}
-
-def determine_lake(lat, lng):
-    for box in LAKE_BOXES:
-        if box["latMin"] <= lat <= box["latMax"] and box["lngMin"] <= lng <= box["lngMax"]:
-            return box["id"], STATIONS[box["id"]]["id"]
-    nearest = min(STATIONS.items(), key=lambda kv: (kv[1]["lat"] - lat)**2 + (kv[1]["lng"] - lng)**2)
-    return nearest[0], nearest[1]["id"]
 
 def degrees_to_cardinal(deg):
     if deg is None: return None
@@ -131,6 +107,78 @@ def format_hour_12(iso_str):
         return f"{day} {h12}{ampm}"
     except:
         return iso_str
+
+def haversine_km(lat1, lng1, lat2, lng2):
+    R = 6371.0
+    dLat = math.radians(lat2 - lat1)
+    dLng = math.radians(lng2 - lng1)
+    a = math.sin(dLat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dLng/2)**2
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+def bearing_deg(lat1, lng1, lat2, lng2):
+    """Bearing FROM (lat1,lng1) TO (lat2,lng2), degrees 0-360."""
+    dLng = math.radians(lng2 - lng1)
+    lat1r, lat2r = math.radians(lat1), math.radians(lat2)
+    x = math.sin(dLng) * math.cos(lat2r)
+    y = math.cos(lat1r) * math.sin(lat2r) - math.sin(lat1r) * math.cos(lat2r) * math.cos(dLng)
+    return (math.degrees(math.atan2(x, y)) + 360) % 360
+
+def abs_angle_diff(a, b):
+    diff = abs(a - b) % 360
+    return diff if diff <= 180 else 360 - diff
+
+def calc_consistent_wind_hours(om_data, wind_dir, now_utc):
+    """Count consecutive past hours where wind direction was within ±45° of current."""
+    if wind_dir is None:
+        return 0
+    hourly = om_data.get("hourly", {})
+    times = hourly.get("time", [])
+    dirs = hourly.get("wind_direction_10m", [])
+    now_local = local_now_str(om_data, now_utc)
+    hours = 0
+    for t, d in reversed(list(zip(times, dirs))):
+        if t > now_local:
+            continue
+        if d is None:
+            break
+        if abs_angle_diff(d, wind_dir) <= 45:
+            hours += 1
+        else:
+            break
+    return hours
+
+def determine_buoy(lat, lng, wind_dir=None, wind_hours=0):
+    """
+    Select the most hydrodynamically relevant Georgian Bay buoy.
+    Nearest by distance is the baseline. If wind has been blowing consistently
+    from a buoy's direction, that buoy's water is being transported to the angler
+    and gets a boost proportional to wind duration (capped at 12h).
+    Transport direction = (wind_dir + 180) % 360 — water moves opposite to wind origin.
+    """
+    best, best_score = None, -1
+    transport_dir = ((wind_dir + 180) % 360) if wind_dir is not None else None
+
+    for buoy in GB_BUOYS:
+        dist_km = haversine_km(lat, lng, buoy["lat"], buoy["lng"])
+        dist_score = 1.0 / max(dist_km, 1.0)
+
+        transport_boost = 0.0
+        if transport_dir is not None and wind_hours > 0:
+            brng = bearing_deg(buoy["lat"], buoy["lng"], lat, lng)
+            diff = abs_angle_diff(transport_dir, brng)
+            duration_factor = min(wind_hours, 12) / 12.0
+            if diff <= 45:
+                transport_boost = duration_factor * 2.0
+            elif diff <= 90:
+                transport_boost = ((90 - diff) / 90.0) * duration_factor
+
+        score = dist_score + transport_boost
+        if score > best_score:
+            best_score = score
+            best = buoy
+
+    return best
+
 
 # --- Async Fetchers ---
 
@@ -277,7 +325,7 @@ async def fetch_erddap_value(client, url, column_name):
         return None
 
 async def fetch_chlorophyll_turbidity(client, lat, lng, lake_id):
-    prefix = LAKE_ERDDAP_PREFIX.get(lake_id, "LH")
+    prefix = lake_id  # caller passes "LH" directly
     lat0 = round(lat - 0.3, 4)
     lat1 = round(lat + 0.3, 4)
     lng0 = round(lng - 0.3, 4)
@@ -397,19 +445,21 @@ async def get_conditions(lat: float, lng: float):
     if cache_key in env_cache:
         return env_cache[cache_key]
 
-    lake_id, station_id = determine_lake(lat, lng)
     now = datetime.utcnow()
 
     async with httpx.AsyncClient() as client:
-        (om_data, ndbc_data, owm_data, uv_data,
-         astro_data, glerl_sst, chl_turb, currents, alerts) = await asyncio.gather(
+        (om_data, ndbc_south, ndbc_central, ndbc_north,
+         owm_data, uv_data, astro_data, glerl_sst,
+         chl_turb, currents, alerts) = await asyncio.gather(
             fetch_open_meteo(client, lat, lng),
-            fetch_ndbc(client, station_id),
+            fetch_ndbc(client, "45143"),
+            fetch_ndbc(client, "45137"),
+            fetch_ndbc(client, "45135"),
             fetch_owm(client, lat, lng),
             fetch_uv(client, lat, lng),
             fetch_usno_astro(client, lat, lng, now),
             fetch_glerl_sst(client, lat, lng),
-            fetch_chlorophyll_turbidity(client, lat, lng, lake_id),
+            fetch_chlorophyll_turbidity(client, lat, lng, "LH"),
             fetch_marine_currents(client, lat, lng),
             fetch_nws_alerts(client, lat, lng),
             return_exceptions=True,
@@ -417,7 +467,15 @@ async def get_conditions(lat: float, lng: float):
 
     def safe(d, fallback=None): return d if isinstance(d, (dict, list)) else (fallback or {})
     om = safe(om_data)
-    ndbc = safe(ndbc_data)
+
+    wind_dir = om.get("current", {}).get("wind_direction_10m")
+    wind_hours = calc_consistent_wind_hours(om, wind_dir, now)
+    selected = determine_buoy(lat, lng, wind_dir, wind_hours)
+    ndbc = safe({
+        "45143": ndbc_south,
+        "45137": ndbc_central,
+        "45135": ndbc_north,
+    }.get(selected["id"]))
     owm = safe(owm_data)
     uv = safe(uv_data)
     astro = safe(astro_data)
@@ -449,8 +507,10 @@ async def get_conditions(lat: float, lng: float):
 
     response = {
         "fetched_at": now.isoformat(),
-        "lake_id": lake_id,
-        "ndbc_station_id": station_id,
+        "lake_id": "georgian_bay",
+        "ndbc_station_id": selected["id"],
+        "selected_buoy_id": selected["id"],
+        "selected_buoy_name": selected["name"],
         "query_lat": lat,
         "query_lng": lng,
         "barometric_pressure_hpa": ndbc.get("barometric_pressure_hpa") or r1(c.get("pressure_msl")),
