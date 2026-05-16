@@ -4,9 +4,9 @@ import {
   Modal, View, Text, TouchableOpacity, ScrollView,
   ActivityIndicator, StyleSheet, SafeAreaView,
 } from 'react-native';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
-import { TripConditions, fetchTripConditions } from '../services/weatherWaterService';
+import { TripConditions, fetchTripConditions, BuoyDetail, fetchBuoyDetail } from '../services/weatherWaterService';
 import WeatherWaterCard from './WeatherWaterCard';
 import { celsiusToFahrenheit } from '../utils/formatters';
 
@@ -39,6 +39,23 @@ function MapClickHandler({ onTap }: { onTap: (lat: number, lng: number) => void 
   return null;
 }
 
+const GB_BUOY_MARKERS = [
+  { id: '45143', latitude: 44.940, longitude: -80.627, name: 'South Georgian Bay' },
+  { id: '45137', latitude: 45.540, longitude: -81.020, name: 'Central Georgian Bay' },
+  { id: '45135', latitude: 45.800, longitude: -80.400, name: 'Northern Georgian Bay' },
+];
+
+function createBuoyIcon(isSelected: boolean) {
+  const color = isSelected ? '#4fc3f7' : '#6b7f99';
+  const size = isSelected ? 16 : 12;
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.5)"></div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
+
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -48,10 +65,15 @@ export default function PlanningModal({ visible, onClose }: Props) {
   const [pin, setPin] = useState<[number, number] | null>(null);
   const [conditions, setConditions] = useState<TripConditions | null>(null);
   const [loading, setLoading] = useState(false);
+  const [tappedBuoyId, setTappedBuoyId] = useState<string | null>(null);
+  const [buoyDetail, setBuoyDetail] = useState<BuoyDetail | null>(null);
+  const [buoyDetailLoading, setBuoyDetailLoading] = useState(false);
 
   const handleClose = useCallback(() => {
     setPin(null);
     setConditions(null);
+    setTappedBuoyId(null);
+    setBuoyDetail(null);
     onClose();
   }, [onClose]);
 
@@ -67,6 +89,20 @@ export default function PlanningModal({ visible, onClose }: Props) {
       console.warn('[PlanningModal] fetch failed:', err);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const handleBuoyTap = useCallback(async (buoyId: string) => {
+    setTappedBuoyId(buoyId);
+    setBuoyDetail(null);
+    setBuoyDetailLoading(true);
+    try {
+      const data = await fetchBuoyDetail(buoyId);
+      setBuoyDetail(data);
+    } catch (err) {
+      console.warn('[PlanningModal] buoy fetch failed:', err);
+    } finally {
+      setBuoyDetailLoading(false);
     }
   }, []);
 
@@ -92,6 +128,27 @@ export default function PlanningModal({ visible, onClose }: Props) {
             />
             <MapClickHandler onTap={handleTap} />
             {pin && <Marker position={pin} icon={createPinIcon()} />}
+            {GB_BUOY_MARKERS.map(b => {
+              const isSelected = b.id === conditions?.selected_buoy_id;
+              return (
+                <Marker
+                  key={b.id}
+                  position={[b.latitude, b.longitude]}
+                  icon={createBuoyIcon(isSelected)}
+                  eventHandlers={{ click: () => handleBuoyTap(b.id) }}
+                >
+                  <Popup>
+                    <div style={{ fontFamily: 'sans-serif', minWidth: 140 }}>
+                      <div style={{ fontWeight: 'bold' }}>{b.name}</div>
+                      <div style={{ color: '#666', fontSize: '12px' }}>{b.id}</div>
+                      {isSelected && (
+                        <div style={{ color: '#4fc3f7', fontSize: '12px', marginTop: '4px' }}>📡 AI Selected</div>
+                      )}
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })}
           </MapContainer>
         </View>
 
@@ -104,6 +161,57 @@ export default function PlanningModal({ visible, onClose }: Props) {
         <ScrollView style={styles.results} contentContainerStyle={{ paddingBottom: 40 }}>
           {loading && (
             <ActivityIndicator color="#4fc3f7" size="large" style={{ marginTop: 28 }} />
+          )}
+          {tappedBuoyId && (
+            <View style={styles.buoyDetailPanel}>
+              <Text style={styles.buoyDetailTitle}>
+                📡 {GB_BUOY_MARKERS.find(b => b.id === tappedBuoyId)?.name}
+                {tappedBuoyId === conditions?.selected_buoy_id ? '  ·  AI Selected' : ''}
+              </Text>
+              {buoyDetailLoading && <ActivityIndicator color="#4fc3f7" style={{ marginVertical: 8 }} />}
+              {buoyDetail && !buoyDetailLoading && (
+                <>
+                  <View style={styles.buoyDetailRow}>
+                    <Text style={styles.buoyDetailLabel}>Wind</Text>
+                    <Text style={styles.buoyDetailValue}>
+                      {buoyDetail.wind_speed_ms !== null
+                        ? `${Math.round(buoyDetail.wind_speed_ms * 3.6)} km/h ${buoyDetail.wind_direction_label ?? ''}`
+                        : '—'}
+                    </Text>
+                  </View>
+                  <View style={styles.buoyDetailRow}>
+                    <Text style={styles.buoyDetailLabel}>Gusts</Text>
+                    <Text style={styles.buoyDetailValue}>
+                      {buoyDetail.wind_gust_ms !== null ? `${Math.round(buoyDetail.wind_gust_ms * 3.6)} km/h` : '—'}
+                    </Text>
+                  </View>
+                  <View style={styles.buoyDetailRow}>
+                    <Text style={styles.buoyDetailLabel}>Waves</Text>
+                    <Text style={styles.buoyDetailValue}>
+                      {buoyDetail.wave_height_m !== null ? `${buoyDetail.wave_height_m} m` : '—'}
+                    </Text>
+                  </View>
+                  <View style={styles.buoyDetailRow}>
+                    <Text style={styles.buoyDetailLabel}>Pressure</Text>
+                    <Text style={styles.buoyDetailValue}>
+                      {buoyDetail.pressure_hpa !== null ? `${buoyDetail.pressure_hpa} hPa` : '—'}
+                    </Text>
+                  </View>
+                  <View style={styles.buoyDetailRow}>
+                    <Text style={styles.buoyDetailLabel}>Air Temp</Text>
+                    <Text style={styles.buoyDetailValue}>
+                      {buoyDetail.air_temp_c !== null ? `${Math.round(buoyDetail.air_temp_c * 9 / 5 + 32)}°F` : '—'}
+                    </Text>
+                  </View>
+                  <View style={styles.buoyDetailRow}>
+                    <Text style={styles.buoyDetailLabel}>Water Temp</Text>
+                    <Text style={styles.buoyDetailValue}>
+                      {buoyDetail.water_temp_c !== null ? `${Math.round(buoyDetail.water_temp_c * 9 / 5 + 32)}°F` : '—'}
+                    </Text>
+                  </View>
+                </>
+              )}
+            </View>
           )}
           {conditions && !loading && (
             <>
@@ -171,6 +279,33 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: '#1a2d4a',
   },
   results: { flex: 1 },
+  buoyDetailPanel: {
+    backgroundColor: '#0d1f35',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a2d4a',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  buoyDetailTitle: {
+    color: '#4fc3f7',
+    fontSize: 13,
+    fontWeight: '600' as const,
+    marginBottom: 8,
+  },
+  buoyDetailRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    paddingVertical: 3,
+  },
+  buoyDetailLabel: {
+    color: '#8899aa',
+    fontSize: 12,
+  },
+  buoyDetailValue: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '500' as const,
+  },
   buoyBanner: {
     backgroundColor: '#0d1f35', borderBottomWidth: 1, borderBottomColor: '#1a2d4a',
     paddingHorizontal: 16, paddingVertical: 10,

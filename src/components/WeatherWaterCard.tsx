@@ -71,7 +71,7 @@ function dash(v: string | number | null | undefined): string {
 }
 
 function moonEmoji(label: string | null): string {
-  switch (label) {
+  switch (label?.toLowerCase()) {
     case 'new moon':       return '🌑';
     case 'waxing crescent': return '🌒';
     case 'first quarter':  return '🌓';
@@ -316,6 +316,7 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
           <Text style={[styles.buoyCol, styles.buoyColLocation, styles.buoyHeaderText]}>Location</Text>
         </View>
         {[
+          { id: '45135', name: 'North Georgian Bay', location: '45.800°N 80.400°W · Northern Bay' },
           { id: '45137', name: 'Georgian Bay',       location: '45.540°N 81.020°W · Western Islands' },
           { id: '45143', name: 'South Georgian Bay', location: '44.940°N 80.627°W · Near Collingwood' },
         ].map((buoy) => (

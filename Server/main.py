@@ -160,7 +160,7 @@ def determine_buoy(lat, lng, wind_dir=None, wind_hours=0):
 
     for buoy in GB_BUOYS:
         dist_km = haversine_km(lat, lng, buoy["lat"], buoy["lng"])
-        dist_score = 1.0 / max(dist_km, 1.0)
+        dist_score = 100.0 / max(dist_km, 1.0)
 
         transport_boost = 0.0
         if transport_dir is not None and wind_hours > 0:
@@ -253,32 +253,36 @@ async def fetch_uv(client, lat, lng):
     except:
         return {}
 
-async def fetch_usno_astro(client, lat, lng, date):
+async def fetch_astro_openmeteo(client, lat, lng):
     try:
-        date_str = date.strftime("%Y-%m-%d")
-        # EST = UTC-5, EDT = UTC-4; use -4 for May-Oct
-        tz = -4
-        url = f"https://aa.usno.navy.mil/api/rstt/oneday?date={date_str}&coords={lat},{lng}&tz={tz}"
-        resp = await client.get(url, timeout=10.0, headers=USER_AGENT)
+        url = (
+            f"https://api.open-meteo.com/v1/forecast"
+            f"?latitude={lat}&longitude={lng}"
+            f"&daily=sunrise,sunset&timezone=auto&forecast_days=1"
+        )
+        resp = await client.get(url, timeout=10.0)
         data = resp.json()
-        sun = data.get("properties", {}).get("data", {}).get("sundata", [])
-        moon = data.get("properties", {}).get("data", {}).get("moondata", [])
-
-        def pick(arr, phen):
-            for e in arr:
-                if e.get("phen") == phen:
-                    return e.get("time")
-            return None
-
-        return {
-            "sunrise": pick(sun, "Rise"),
-            "sunset": pick(sun, "Set"),
-            "moonrise": pick(moon, "Rise"),
-            "moonset": pick(moon, "Set"),
-            "moonUpperTransit": pick(moon, "Upper Transit"),
-        }
+        daily = data.get("daily", {})
+        def first_hhmm(key):
+            vals = daily.get(key, [None])
+            v = vals[0] if vals else None
+            if not v: return None
+            try: return v.split("T")[1][:5]
+            except: return None
+        return {"sunrise": first_hhmm("sunrise"), "sunset": first_hhmm("sunset")}
     except:
         return {}
+
+def calc_moon_times(moon_phase):
+    def to_hhmm(total_minutes):
+        m = int(total_minutes) % (24 * 60)
+        return f"{m // 60:02d}:{m % 60:02d}"
+    transit_min = (12 * 60 + moon_phase * 24 * 60) % (24 * 60)
+    return {
+        "moonUpperTransit": to_hhmm(transit_min),
+        "moonrise":         to_hhmm(transit_min - 6 * 60),
+        "moonset":          to_hhmm(transit_min + 6 * 60),
+    }
 
 async def fetch_glerl_sst(client, lat, lng):
     try:
@@ -457,7 +461,7 @@ async def get_conditions(lat: float, lng: float):
             fetch_ndbc(client, "45135"),
             fetch_owm(client, lat, lng),
             fetch_uv(client, lat, lng),
-            fetch_usno_astro(client, lat, lng, now),
+            fetch_astro_openmeteo(client, lat, lng),
             fetch_glerl_sst(client, lat, lng),
             fetch_chlorophyll_turbidity(client, lat, lng, "LH"),
             fetch_marine_currents(client, lat, lng),
@@ -478,7 +482,16 @@ async def get_conditions(lat: float, lng: float):
     }.get(selected["id"]))
     owm = safe(owm_data)
     uv = safe(uv_data)
-    astro = safe(astro_data)
+    solar = safe(astro_data)
+    moon_phase = calc_moon_phase(now)
+    moon_times = calc_moon_times(moon_phase)
+    astro = {
+        "sunrise": solar.get("sunrise"),
+        "sunset": solar.get("sunset"),
+        "moonrise": moon_times["moonrise"],
+        "moonset": moon_times["moonset"],
+        "moonUpperTransit": moon_times["moonUpperTransit"],
+    }
     sst_sat = glerl_sst if isinstance(glerl_sst, (float, int, type(None))) else None
     chl = safe(chl_turb)
     cur = safe(currents)
@@ -487,7 +500,6 @@ async def get_conditions(lat: float, lng: float):
     c = om.get("current", {})
     pressure_tendency, pressure_trend = calc_pressure_trend(om, now)
     prev_wind = build_previous_wind(om, now)
-    moon_phase = calc_moon_phase(now)
     solunar = compute_solunar(astro, moon_phase)
 
     dew_point = None
