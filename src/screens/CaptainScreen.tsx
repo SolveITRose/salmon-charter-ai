@@ -8,10 +8,7 @@ import {
   ScrollView,
   Modal,
   Linking,
-  ActivityIndicator,
-  SafeAreaView,
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import uuid from 'react-native-uuid';
 
@@ -22,6 +19,7 @@ import { computeHydroScore } from '../agents/hydrodynamicAgent';
 import { insertEvent, updateEvent, insertMark, updateMark, getPendingBiteEvents } from '../storage/localDB';
 import { formatEventCode, celsiusToFahrenheit, formatTimestamp } from '../utils/formatters';
 import WeatherWaterCard from '../components/WeatherWaterCard';
+import PlanningModal from '../components/PlanningModal';
 import FishFinderModal from '../components/FishFinderModal';
 import BiteCompletionModal from '../components/BiteCompletionModal';
 import { fetchTripConditions, fetchPreyData, TripConditions } from '../services/weatherWaterService';
@@ -61,13 +59,6 @@ function formatCoords(lat: number, lng: number): string {
 
 const COUNTER_KEY = 'event_counter';
 
-const GEORGIAN_BAY_REGION = {
-  latitude: 45.0,
-  longitude: -80.5,
-  latitudeDelta: 1.8,
-  longitudeDelta: 1.4,
-};
-
 export default function CaptainScreen() {
   const [tripConditions, setTripConditions] = useState<TripConditions | null>(null);
   const [tripConditionsLoading, setTripConditionsLoading] = useState(false);
@@ -89,9 +80,6 @@ export default function CaptainScreen() {
   const [otherNote, setOtherNote] = useState('');
   const [pendingMarkForScan, setPendingMarkForScan] = useState<GpsMark | null>(null);
   const [planningVisible, setPlanningVisible] = useState(false);
-  const [planningPin, setPlanningPin] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [planningConditions, setPlanningConditions] = useState<TripConditions | null>(null);
-  const [planningLoading, setPlanningLoading] = useState(false);
   const lastGpsRef = useRef<GpsData | null>(null);
 
   const loadPendingBites = useCallback(async () => {
@@ -368,28 +356,6 @@ export default function CaptainScreen() {
     setPendingMarkForScan(null);
   }, [pendingMarkForScan]);
 
-  const closePlanning = useCallback(() => {
-    setPlanningVisible(false);
-    setPlanningPin(null);
-    setPlanningConditions(null);
-  }, []);
-
-  const handlePlanningTap = useCallback(async (e: any) => {
-    const { latitude, longitude } = e.nativeEvent.coordinate;
-    setPlanningPin({ latitude, longitude });
-    setPlanningConditions(null);
-    setPlanningLoading(true);
-    try {
-      const date = new Date().toISOString().split('T')[0];
-      const conditions = await fetchTripConditions(latitude, longitude, date);
-      setPlanningConditions(conditions);
-    } catch (err) {
-      console.warn('[Captain] planning fetch failed:', err);
-    } finally {
-      setPlanningLoading(false);
-    }
-  }, []);
-
   return (
     <ScrollView
       style={styles.container}
@@ -630,80 +596,7 @@ export default function CaptainScreen() {
         <Text style={styles.planButtonText}>🗺  Plan a Trip</Text>
       </TouchableOpacity>
 
-      <Modal visible={planningVisible} animationType="slide" onRequestClose={closePlanning}>
-        <SafeAreaView style={styles.planModal}>
-          <View style={styles.planHeader}>
-            <Text style={styles.planTitle}>Trip Planner  ·  Georgian Bay</Text>
-            <TouchableOpacity onPress={closePlanning} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Text style={styles.planClose}>✕  Close</Text>
-            </TouchableOpacity>
-          </View>
-
-          <MapView
-            style={styles.planMap}
-            initialRegion={GEORGIAN_BAY_REGION}
-            onPress={handlePlanningTap}
-          >
-            {planningPin && <Marker coordinate={planningPin} />}
-          </MapView>
-
-          <Text style={styles.planHint}>
-            {planningPin
-              ? `${planningPin.latitude.toFixed(3)}°N  ${Math.abs(planningPin.longitude).toFixed(3)}°W  —  tap anywhere to move`
-              : 'Tap anywhere on the map to load conditions for that spot'}
-          </Text>
-
-          <ScrollView style={styles.planResults} contentContainerStyle={{ paddingBottom: 40 }}>
-            {planningLoading && (
-              <ActivityIndicator color="#4fc3f7" size="large" style={{ marginTop: 28 }} />
-            )}
-            {planningConditions && !planningLoading && (
-              <>
-                <View style={styles.planBuoyBanner}>
-                  <Text style={styles.planBuoyText}>
-                    📡 {planningConditions.selected_buoy_name}  ·  {planningConditions.selected_buoy_id}
-                  </Text>
-                </View>
-                <View style={styles.planStatsGrid}>
-                  <View style={styles.planStat}>
-                    <Text style={styles.planStatLabel}>Pressure</Text>
-                    <Text style={styles.planStatValue}>
-                      {planningConditions.barometric_pressure_hpa
-                        ? `${Math.round(planningConditions.barometric_pressure_hpa)} hPa${trendArrow(planningConditions.pressure_trend)}`
-                        : '—'}
-                    </Text>
-                  </View>
-                  <View style={styles.planStat}>
-                    <Text style={styles.planStatLabel}>Wind</Text>
-                    <Text style={styles.planStatValue}>
-                      {planningConditions.wind_speed_mph
-                        ? `${Math.round(planningConditions.wind_speed_mph * 1.609)} km/h ${planningConditions.wind_direction_label ?? ''}`
-                        : '—'}
-                    </Text>
-                  </View>
-                  <View style={styles.planStat}>
-                    <Text style={styles.planStatLabel}>Waves</Text>
-                    <Text style={styles.planStatValue}>
-                      {planningConditions.wave_height_ft != null ? `${planningConditions.wave_height_ft} ft` : '—'}
-                    </Text>
-                  </View>
-                  <View style={styles.planStat}>
-                    <Text style={styles.planStatLabel}>Surface Temp</Text>
-                    <Text style={styles.planStatValue}>
-                      {planningConditions.sst_buoy_c != null
-                        ? cToF(planningConditions.sst_buoy_c)
-                        : planningConditions.sst_satellite_c != null
-                          ? cToF(planningConditions.sst_satellite_c)
-                          : '—'}
-                    </Text>
-                  </View>
-                </View>
-                <WeatherWaterCard conditions={planningConditions} loading={false} nearestCity={null} />
-              </>
-            )}
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
+      <PlanningModal visible={planningVisible} onClose={() => setPlanningVisible(false)} />
 
       {/* ── Ontario Fishing Regulations ── */}
       {fmzInfo && (
@@ -1314,76 +1207,5 @@ const styles = StyleSheet.create({
     color: '#4fc3f7',
     fontSize: 15,
     fontWeight: '700',
-  },
-  planModal: {
-    flex: 1,
-    backgroundColor: '#0a1628',
-  },
-  planHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1a2d4a',
-  },
-  planTitle: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  planClose: {
-    color: '#1e90ff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  planMap: {
-    height: '42%',
-  },
-  planHint: {
-    color: '#8899aa',
-    fontSize: 12,
-    textAlign: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1a2d4a',
-  },
-  planResults: {
-    flex: 1,
-  },
-  planBuoyBanner: {
-    backgroundColor: '#0d1f35',
-    borderBottomWidth: 1,
-    borderBottomColor: '#1a2d4a',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  planBuoyText: {
-    color: '#4fc3f7',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  planStatsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 12,
-    gap: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1a2d4a',
-  },
-  planStat: {
-    width: '47%',
-  },
-  planStatLabel: {
-    color: '#8899aa',
-    fontSize: 11,
-    marginBottom: 2,
-  },
-  planStatValue: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
   },
 });
