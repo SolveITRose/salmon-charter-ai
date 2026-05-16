@@ -347,6 +347,25 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
             )}
           </View>
         ))}
+        <View style={styles.shoreHeader}>
+          <Text style={styles.shoreHeaderText}>Environment Canada · Shore Stations</Text>
+        </View>
+        {[
+          { id: 'OWP',    name: 'Wasaga Beach PP', location: '44.499°N 80.047°W · South shore' },
+          { id: 'Wiarton',name: 'Wiarton',         location: '44.746°N 81.107°W · Bruce Peninsula, Colpoy\'s Bay' },
+          { id: 'TTR',    name: 'Tobermory',       location: '45.224°N 81.635°W · Bruce Peninsula tip' },
+          { id: 'XPC',    name: 'Parry Sound CCG', location: '45.344°N 80.042°W · East shore, Coast Guard' },
+          { id: 'NR-02P', name: 'Point au Baril',  location: '45.568°N 80.330°W · East shore, N of Parry Sound' },
+          { id: 'NR-05P', name: 'South Baymouth',  location: '45.572°N 82.014°W · Manitoulin Island, S shore' },
+          { id: 'NR-01P', name: 'French River',    location: '46.017°N 80.582°W · North shore' },
+          { id: 'TZE',    name: 'Gore Bay',        location: '45.890°N 82.572°W · Manitoulin Island, N shore' },
+        ].map((stn) => (
+          <View key={stn.id} style={styles.buoyRow}>
+            <Text style={[styles.buoyCol, styles.buoyColId, styles.buoyText]}>{stn.id}</Text>
+            <Text style={[styles.buoyCol, styles.buoyColName, styles.buoyText]}>{stn.name}</Text>
+            <Text style={[styles.buoyCol, styles.buoyColLocation, styles.buoyText]}>{stn.location}</Text>
+          </View>
+        ))}
         <TouchableOpacity
           onPress={() => Linking.openURL('https://www.glerl.noaa.gov/res/glcfs/ncast.php?lake=mih')}
           style={styles.glerlLink}
@@ -631,6 +650,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     paddingVertical: 6,
     textAlign: 'center',
+  },
+  shoreHeader: {
+    paddingTop: 8,
+    paddingBottom: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#1a2d4a',
+    marginTop: 4,
+  },
+  shoreHeaderText: {
+    color: '#4fc3f7',
+    fontSize: 10,
+    fontWeight: '600' as const,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
   },
   glerlLink: {
     marginTop: 8,
