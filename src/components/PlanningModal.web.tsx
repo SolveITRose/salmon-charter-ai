@@ -122,7 +122,7 @@ export default function PlanningModal({ visible, onClose }: Props) {
             style={{ width: '100%', height: '100%' }}
           >
             <TileLayer
-              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
               attribution='&copy; OpenStreetMap contributors &copy; CARTO'
             />
             <MapClickHandler onTap={handleTap} />
