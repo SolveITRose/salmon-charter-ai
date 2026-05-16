@@ -27,7 +27,6 @@ env_cache = TTLCache(maxsize=100, ttl=300)
 GB_BUOYS = [
     {"id": "45143", "lat": 44.940, "lng": -80.627, "name": "South Georgian Bay"},
     {"id": "45137", "lat": 45.540, "lng": -81.020, "name": "Central Georgian Bay"},
-    {"id": "45135", "lat": 45.800, "lng": -80.400, "name": "Northern Georgian Bay"},
 ]
 
 def degrees_to_cardinal(deg):
@@ -452,13 +451,12 @@ async def get_conditions(lat: float, lng: float):
     now = datetime.utcnow()
 
     async with httpx.AsyncClient() as client:
-        (om_data, ndbc_south, ndbc_central, ndbc_north,
+        (om_data, ndbc_south, ndbc_central,
          owm_data, uv_data, astro_data, glerl_sst,
          chl_turb, currents, alerts) = await asyncio.gather(
             fetch_open_meteo(client, lat, lng),
             fetch_ndbc(client, "45143"),
             fetch_ndbc(client, "45137"),
-            fetch_ndbc(client, "45135"),
             fetch_owm(client, lat, lng),
             fetch_uv(client, lat, lng),
             fetch_astro_openmeteo(client, lat, lng),
@@ -478,7 +476,6 @@ async def get_conditions(lat: float, lng: float):
     ndbc = safe({
         "45143": ndbc_south,
         "45137": ndbc_central,
-        "45135": ndbc_north,
     }.get(selected["id"]))
     owm = safe(owm_data)
     uv = safe(uv_data)

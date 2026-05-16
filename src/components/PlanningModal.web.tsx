@@ -42,7 +42,6 @@ function MapClickHandler({ onTap }: { onTap: (lat: number, lng: number) => void 
 const GB_BUOY_MARKERS = [
   { id: '45143', latitude: 44.940, longitude: -80.627, name: 'South Georgian Bay' },
   { id: '45137', latitude: 45.540, longitude: -81.020, name: 'Central Georgian Bay' },
-  { id: '45135', latitude: 45.800, longitude: -80.400, name: 'Northern Georgian Bay' },
 ];
 
 function createBuoyIcon(isSelected: boolean) {
