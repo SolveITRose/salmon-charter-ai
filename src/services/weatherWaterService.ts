@@ -53,6 +53,8 @@ export interface TripConditions {
   marine_warning_active: boolean;
   marine_warning_text: string | null;
   atmospheric_source: 'ndbc' | 'owm';
+  selected_buoy_id: string;
+  selected_buoy_name: string;
 }
 
 export async function fetchTripConditions(
