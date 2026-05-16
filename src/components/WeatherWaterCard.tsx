@@ -374,6 +374,58 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
         </TouchableOpacity>
       </Section>
 
+      {/* 3b. Northern Georgian Bay Marine Forecast */}
+      {conditions.marine_forecast_north && (
+        <Section title={`Northern Georgian Bay${conditions.marine_forecast_north.issued_at ? `  ·  ${conditions.marine_forecast_north.issued_at}` : ''}`}>
+          {conditions.marine_forecast_north.warning && (
+            <View style={styles.marineWarning}>
+              <Text style={styles.marineWarningText}>{conditions.marine_forecast_north.warning}</Text>
+            </View>
+          )}
+          {conditions.marine_forecast_north.winds && (
+            <Row label="Winds" value={conditions.marine_forecast_north.winds} />
+          )}
+          {conditions.marine_forecast_north.waves && (
+            <Row label="Waves" value={conditions.marine_forecast_north.waves} />
+          )}
+          {conditions.marine_forecast_north.weather_visibility && (
+            <Row label="Weather" value={conditions.marine_forecast_north.weather_visibility} />
+          )}
+          {conditions.marine_forecast_north.extended_forecast && (
+            <View style={styles.extendedForecast}>
+              <Text style={styles.extendedLabel}>Extended</Text>
+              <Text style={styles.extendedText}>{conditions.marine_forecast_north.extended_forecast}</Text>
+            </View>
+          )}
+        </Section>
+      )}
+
+      {/* 3c. Southern Georgian Bay Marine Forecast */}
+      {conditions.marine_forecast_south && (
+        <Section title={`Southern Georgian Bay${conditions.marine_forecast_south.issued_at ? `  ·  ${conditions.marine_forecast_south.issued_at}` : ''}`}>
+          {conditions.marine_forecast_south.warning && (
+            <View style={styles.marineWarning}>
+              <Text style={styles.marineWarningText}>{conditions.marine_forecast_south.warning}</Text>
+            </View>
+          )}
+          {conditions.marine_forecast_south.winds && (
+            <Row label="Winds" value={conditions.marine_forecast_south.winds} />
+          )}
+          {conditions.marine_forecast_south.waves && (
+            <Row label="Waves" value={conditions.marine_forecast_south.waves} />
+          )}
+          {conditions.marine_forecast_south.weather_visibility && (
+            <Row label="Weather" value={conditions.marine_forecast_south.weather_visibility} />
+          )}
+          {conditions.marine_forecast_south.extended_forecast && (
+            <View style={styles.extendedForecast}>
+              <Text style={styles.extendedLabel}>Extended</Text>
+              <Text style={styles.extendedText}>{conditions.marine_forecast_south.extended_forecast}</Text>
+            </View>
+          )}
+        </Section>
+      )}
+
       {/* 4. Food Chain */}
       <Section title="Food Chain (Satellite)">
         <Text style={styles.foodChainText}>
@@ -686,5 +738,31 @@ const styles = StyleSheet.create({
     color: '#1e90ff',
     fontSize: 13,
     fontWeight: '600',
+  },
+  marineWarning: {
+    backgroundColor: '#3d2000',
+    borderRadius: 6,
+    padding: 8,
+    marginBottom: 6,
+  },
+  marineWarningText: {
+    color: '#ffb74d',
+    fontSize: 12,
+  },
+  extendedForecast: {
+    marginTop: 6,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#1a2d4a',
+  },
+  extendedLabel: {
+    color: '#8899aa',
+    fontSize: 11,
+    marginBottom: 3,
+  },
+  extendedText: {
+    color: '#ccd6e8',
+    fontSize: 12,
+    lineHeight: 18,
   },
 });

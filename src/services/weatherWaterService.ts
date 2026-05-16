@@ -1,5 +1,15 @@
 const PROXY_URL = process.env.EXPO_PUBLIC_PROXY_URL ?? "http://192.168.2.87:8000";
 
+export interface MarineAreaForecast {
+  area_name: string;
+  issued_at: string | null;
+  warning: string | null;
+  winds: string | null;
+  waves: string | null;
+  weather_visibility: string | null;
+  extended_forecast: string | null;
+}
+
 export interface TripConditions {
   fetched_at: string;
   lake_id: string;
@@ -55,6 +65,8 @@ export interface TripConditions {
   atmospheric_source: 'ndbc' | 'owm';
   selected_buoy_id: string;
   selected_buoy_name: string;
+  marine_forecast_north: MarineAreaForecast | null;
+  marine_forecast_south: MarineAreaForecast | null;
 }
 
 export async function fetchTripConditions(

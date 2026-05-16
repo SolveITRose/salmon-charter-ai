@@ -1,6 +1,7 @@
 import asyncio
 import httpx
 import math
+import re
 from datetime import datetime, timedelta
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -453,7 +454,8 @@ async def get_conditions(lat: float, lng: float):
     async with httpx.AsyncClient() as client:
         (om_data, ndbc_south, ndbc_central,
          owm_data, uv_data, astro_data, glerl_sst,
-         chl_turb, currents, alerts) = await asyncio.gather(
+         chl_turb, currents, alerts,
+         fc_north, fc_south) = await asyncio.gather(
             fetch_open_meteo(client, lat, lng),
             fetch_ndbc(client, "45143"),
             fetch_ndbc(client, "45137"),
@@ -464,6 +466,8 @@ async def get_conditions(lat: float, lng: float):
             fetch_chlorophyll_turbidity(client, lat, lng, "LH"),
             fetch_marine_currents(client, lat, lng),
             fetch_nws_alerts(client, lat, lng),
+            fetch_eccc_marine_forecast(client, "05501"),
+            fetch_eccc_marine_forecast(client, "05505"),
             return_exceptions=True,
         )
 
@@ -561,6 +565,8 @@ async def get_conditions(lat: float, lng: float):
         "marine_warning_active": warn.get("marine_warning_active", False),
         "marine_warning_text": warn.get("marine_warning_text"),
         "atmospheric_source": "owm" if OWM_KEY else "ndbc",
+        "marine_forecast_north": fc_north if isinstance(fc_north, dict) and fc_north else None,
+        "marine_forecast_south": fc_south if isinstance(fc_south, dict) and fc_south else None,
     }
 
     env_cache[cache_key] = response
@@ -617,6 +623,70 @@ async def get_buoy(station_id: str):
         data = await fetch_ndbc_full(client, station_id)
     env_cache[cache_key] = data
     return data
+
+
+async def fetch_eccc_marine_forecast(client, site_id: str) -> dict:
+    try:
+        url = (
+            f"https://www.weather.gc.ca/marine/forecast_e.html"
+            f"?mapID=11&siteID={site_id}&stationID=45143"
+        )
+        resp = await client.get(url, timeout=15.0, headers=USER_AGENT)
+        if not resp.is_success:
+            return {}
+        html = resp.text
+
+        def strip_tags(s: str) -> str:
+            s = re.sub(r'<(script|style)[^>]*>.*?</\1>', '', s, flags=re.DOTALL | re.IGNORECASE)
+            s = re.sub(r'<[^>]+>', ' ', s)
+            s = s.replace('&nbsp;', ' ').replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
+            return re.sub(r'\s+', ' ', s).strip()
+
+        def clean_body(s: str):
+            s = strip_tags(s)
+            s = re.sub(r'^Issued\s+\d{1,2}:\d{2}\s+[AP]M\s+\w+\s+\d{1,2}\s+\w+\s+\d{4}\.?\s*', '', s)
+            s = s.strip()
+            return s if s else None
+
+        area_name = ""
+        title_m = re.search(r'<title[^>]*>(.*?)</title>', html, re.IGNORECASE | re.DOTALL)
+        if title_m:
+            area_name = strip_tags(title_m.group(1)).split('-')[0].strip()
+
+        issued_at = None
+        issued_m = re.search(r'Issued\s+(\d{1,2}:\d{2}\s+[AP]M\s+\w+\s+\d{1,2}\s+\w+\s+\d{4})', html)
+        if issued_m:
+            issued_at = issued_m.group(1)
+
+        result = {
+            "area_name": area_name,
+            "issued_at": issued_at,
+            "warning": None,
+            "winds": None,
+            "waves": None,
+            "weather_visibility": None,
+            "extended_forecast": None,
+        }
+
+        for section in re.split(r'<h2[^>]*>', html, flags=re.IGNORECASE)[1:]:
+            h_end = section.find('</h2>')
+            heading = strip_tags(section[:h_end] if h_end >= 0 else section[:80]).lower()
+            body = section[h_end + 5:] if h_end >= 0 else section
+
+            if 'warning' in heading:
+                result["warning"] = clean_body(body)
+            elif 'wind' in heading:
+                result["winds"] = clean_body(body)
+            elif 'wave' in heading:
+                result["waves"] = clean_body(body)
+            elif 'weather' in heading or 'visibility' in heading:
+                result["weather_visibility"] = clean_body(body)
+            elif 'extended' in heading or 'outlook' in heading:
+                result["extended_forecast"] = clean_body(body)
+
+        return result
+    except:
+        return {}
 
 
 def is_canada(lat, lng):
