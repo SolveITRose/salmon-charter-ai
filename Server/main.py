@@ -655,6 +655,67 @@ async def fetch_ndbc_full(client, station_id):
         return {}
 
 
+async def fetch_eccc_station_obs(client, station_id: str) -> dict:
+    try:
+        if station_id.startswith("NR-"):
+            return {"available": False}
+        elif station_id == "Wiarton":
+            url = "https://api.weather.gc.ca/collections/swob-realtime/items?f=json&limit=1&stn_nam-value=Wiarton"
+        else:
+            url = f"https://api.weather.gc.ca/collections/swob-realtime/items?f=json&limit=1&tc_id-value={station_id}"
+
+        resp = await client.get(url, timeout=15.0, headers=USER_AGENT)
+        if not resp.is_success:
+            return {"available": False}
+        data = resp.json()
+        features = data.get("features", [])
+        if not features:
+            return {"available": False}
+
+        p = features[0]["properties"]
+
+        def pv(key):
+            v = p.get(key)
+            if isinstance(v, (int, float)):
+                return r1(v)
+            return v if isinstance(v, str) else None
+
+        wind_dir = pv("avg_wnd_dir_10m_pst10mts")
+        snw = pv("snw_dpth")
+        precip = pv("pcpn_amt_pst1hr")
+        if precip is None:
+            precip = pv("rnfl_amt_pst1hr")
+
+        return {
+            "available": True,
+            "station_name": p.get("stn_nam-value"),
+            "obs_time": (p.get("date_tm-value") or "")[:16],
+            "air_temp_c": pv("air_temp"),
+            "dewpoint_c": pv("dwpt_temp"),
+            "rel_hum_pct": pv("rel_hum"),
+            "wind_speed_kmh": pv("avg_wnd_spd_10m_pst10mts"),
+            "wind_direction_deg": round(wind_dir) if wind_dir is not None else None,
+            "wind_direction_label": degrees_to_cardinal(wind_dir),
+            "wind_gust_kmh": pv("max_wnd_spd_10m_pst10mts"),
+            "pressure_hpa": pv("stn_pres"),
+            "precip_mm_1hr": precip,
+            "snow_depth_cm": snw if (snw is not None and snw >= 0) else None,
+        }
+    except:
+        return {"available": False}
+
+
+@app.get("/eccc-station/{station_id}")
+async def get_eccc_station(station_id: str):
+    cache_key = f"eccc_stn_{station_id}"
+    if cache_key in env_cache:
+        return env_cache[cache_key]
+    async with httpx.AsyncClient() as client:
+        data = await fetch_eccc_station_obs(client, station_id)
+    env_cache[cache_key] = data
+    return data
+
+
 @app.get("/buoy/{station_id}")
 async def get_buoy(station_id: str):
     cache_key = f"buoy_{station_id}"

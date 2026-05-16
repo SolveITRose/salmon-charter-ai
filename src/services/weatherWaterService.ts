@@ -79,6 +79,28 @@ export async function fetchTripConditions(
   return response.json();
 }
 
+export interface EcccStationDetail {
+  available: boolean;
+  station_name: string | null;
+  obs_time: string | null;
+  air_temp_c: number | null;
+  dewpoint_c: number | null;
+  rel_hum_pct: number | null;
+  wind_speed_kmh: number | null;
+  wind_direction_deg: number | null;
+  wind_direction_label: string | null;
+  wind_gust_kmh: number | null;
+  pressure_hpa: number | null;
+  precip_mm_1hr: number | null;
+  snow_depth_cm: number | null;
+}
+
+export async function fetchEcccStationDetail(stationId: string): Promise<EcccStationDetail> {
+  const response = await fetch(`${PROXY_URL}/eccc-station/${encodeURIComponent(stationId)}`);
+  if (!response.ok) throw new Error(`Proxy error: ${response.status}`);
+  return response.json();
+}
+
 export interface BuoyDetail {
   wind_direction_deg: number | null;
   wind_direction_label: string | null;

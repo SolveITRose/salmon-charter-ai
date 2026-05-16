@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, memo, useState } from 'react';
+import React, { useRef, useEffect, memo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,8 +6,12 @@ import {
   Animated,
   TouchableOpacity,
   Linking,
+  Modal,
+  ActivityIndicator,
+  SafeAreaView,
+  ScrollView,
 } from 'react-native';
-import { TripConditions, BuoyDetail, fetchBuoyDetail } from '../services/weatherWaterService';
+import { TripConditions, BuoyDetail, fetchBuoyDetail, EcccStationDetail, fetchEcccStationDetail } from '../services/weatherWaterService';
 import { celsiusToFahrenheit } from '../utils/formatters';
 
 function cToF(c: number | null): string {
@@ -205,6 +209,27 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
   onRetry,
   nearestCity,
 }: Props) {
+  const [stationModalId, setStationModalId] = useState<string | null>(null);
+  const [stationDetail, setStationDetail] = useState<EcccStationDetail | null>(null);
+  const [stationLoading, setStationLoading] = useState(false);
+
+  const handleStationTap = useCallback(async (stationId: string) => {
+    setStationModalId(stationId);
+    setStationDetail(null);
+    setStationLoading(true);
+    try {
+      const data = await fetchEcccStationDetail(stationId);
+      setStationDetail(data);
+    } catch {
+      setStationDetail({ available: false, station_name: null, obs_time: null,
+        air_temp_c: null, dewpoint_c: null, rel_hum_pct: null,
+        wind_speed_kmh: null, wind_direction_deg: null, wind_direction_label: null,
+        wind_gust_kmh: null, pressure_hpa: null, precip_mm_1hr: null, snow_depth_cm: null });
+    } finally {
+      setStationLoading(false);
+    }
+  }, []);
+
   const coordsLabel = conditions
     ? (() => {
         const lat = conditions.query_lat;
@@ -361,7 +386,12 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
           { id: 'TZE',    name: 'Gore Bay',        location: '45.890°N 82.572°W · Manitoulin Island, N shore' },
         ].map((stn) => (
           <View key={stn.id} style={styles.buoyRow}>
-            <Text style={[styles.buoyCol, styles.buoyColId, styles.buoyText]}>{stn.id}</Text>
+            <TouchableOpacity
+              style={styles.buoyCol}
+              onPress={() => handleStationTap(stn.id)}
+            >
+              <Text style={[styles.buoyColId, styles.stationIdLink]}>{stn.id}</Text>
+            </TouchableOpacity>
             <Text style={[styles.buoyCol, styles.buoyColName, styles.buoyText]}>{stn.name}</Text>
             <Text style={[styles.buoyCol, styles.buoyColLocation, styles.buoyText]}>{stn.location}</Text>
           </View>
@@ -497,6 +527,57 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
           }
         />
       </Section>
+
+      {/* ECCC Shore Station Detail Modal */}
+      <Modal
+        visible={stationModalId !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setStationModalId(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <SafeAreaView style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {stationDetail?.station_name ?? stationModalId ?? ''}
+              </Text>
+              <TouchableOpacity onPress={() => setStationModalId(null)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            {stationDetail?.obs_time && (
+              <Text style={styles.modalObsTime}>Observed {stationDetail.obs_time.replace('T', '  ')} UTC</Text>
+            )}
+            <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+              {stationLoading && (
+                <ActivityIndicator color="#4fc3f7" size="large" style={{ marginTop: 24 }} />
+              )}
+              {!stationLoading && stationDetail && !stationDetail.available && (
+                <Text style={styles.modalNoData}>No real-time data available for this station.</Text>
+              )}
+              {!stationLoading && stationDetail?.available && (
+                <View style={styles.modalTable}>
+                  {[
+                    { label: 'Air Temp',   value: stationDetail.air_temp_c != null ? `${Math.round(stationDetail.air_temp_c * 9/5 + 32)}°F  (${stationDetail.air_temp_c}°C)` : null },
+                    { label: 'Dew Point',  value: stationDetail.dewpoint_c != null ? `${Math.round(stationDetail.dewpoint_c * 9/5 + 32)}°F  (${stationDetail.dewpoint_c}°C)` : null },
+                    { label: 'Humidity',   value: stationDetail.rel_hum_pct != null ? `${stationDetail.rel_hum_pct}%` : null },
+                    { label: 'Wind',       value: stationDetail.wind_speed_kmh != null ? `${stationDetail.wind_speed_kmh} km/h  ${stationDetail.wind_direction_label ?? ''}` : null },
+                    { label: 'Gusts',      value: stationDetail.wind_gust_kmh != null ? `${stationDetail.wind_gust_kmh} km/h` : null },
+                    { label: 'Pressure',   value: stationDetail.pressure_hpa != null ? `${stationDetail.pressure_hpa} hPa` : null },
+                    { label: 'Precip 1hr', value: stationDetail.precip_mm_1hr != null ? `${stationDetail.precip_mm_1hr} mm` : null },
+                    { label: 'Snow Depth', value: stationDetail.snow_depth_cm != null ? `${stationDetail.snow_depth_cm} cm` : null },
+                  ].filter(r => r.value != null).map(r => (
+                    <View key={r.label} style={styles.modalRow}>
+                      <Text style={styles.modalRowLabel}>{r.label}</Text>
+                      <Text style={styles.modalRowValue}>{r.value}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+          </SafeAreaView>
+        </View>
+      </Modal>
     </View>
   );
 });
@@ -764,5 +845,72 @@ const styles = StyleSheet.create({
     color: '#ccd6e8',
     fontSize: 12,
     lineHeight: 18,
+  },
+  stationIdLink: {
+    color: '#4fc3f7',
+    fontSize: 12,
+    fontWeight: '600' as const,
+    textDecorationLine: 'underline' as const,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: '#0d1f35',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: '70%',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  modalHeader: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    marginBottom: 4,
+  },
+  modalTitle: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700' as const,
+    flex: 1,
+  },
+  modalClose: {
+    color: '#8899aa',
+    fontSize: 18,
+    paddingLeft: 16,
+  },
+  modalObsTime: {
+    color: '#8899aa',
+    fontSize: 11,
+    marginBottom: 12,
+  },
+  modalNoData: {
+    color: '#8899aa',
+    fontSize: 13,
+    textAlign: 'center' as const,
+    marginTop: 24,
+  },
+  modalTable: {
+    borderTopWidth: 1,
+    borderTopColor: '#1a2d4a',
+  },
+  modalRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a2d4a',
+  },
+  modalRowLabel: {
+    color: '#8899aa',
+    fontSize: 13,
+  },
+  modalRowValue: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '500' as const,
   },
 });
