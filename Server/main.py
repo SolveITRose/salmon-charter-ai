@@ -273,6 +273,45 @@ async def fetch_astro_openmeteo(client, lat, lng):
     except:
         return {}
 
+def calc_sunrise_sunset(lat, lng, date_utc, utc_offset_seconds=-14400):
+    """NOAA solar algorithm. Returns sunrise/sunset in local time (HH:MM)."""
+    try:
+        y, mo, d = date_utc.year, date_utc.month, date_utc.day
+        JD = 367*y - int(7*(y + int((mo+9)/12))/4) + int(275*mo/9) + d + 1721013.5
+        T = (JD - 2451545.0) / 36525.0
+        L0 = (280.46646 + T*(36000.76983 + T*0.0003032)) % 360
+        M = 357.52911 + T*(35999.05029 - 0.0001537*T)
+        Mrad = math.radians(M)
+        C = (math.sin(Mrad)*(1.914602 - T*(0.004817 + 0.000014*T))
+             + math.sin(2*Mrad)*(0.019993 - 0.000101*T)
+             + math.sin(3*Mrad)*0.000289)
+        sun_lon = L0 + C
+        eom = 125.04 - 1934.136*T  # ecliptic omega
+        lam = sun_lon - 0.00569 - 0.00478*math.sin(math.radians(eom))
+        eps = 23 + 26/60 + 21.448/3600 - 46.815/3600*T + 0.00256*math.cos(math.radians(eom))
+        decl = math.degrees(math.asin(math.sin(math.radians(eps))*math.sin(math.radians(lam))))
+        e = 0.016708634 - T*(0.000042037 + 0.0000001267*T)
+        y2 = math.tan(math.radians(eps/2))**2
+        EqT = 4*math.degrees(y2*math.sin(math.radians(2*L0))
+                              - 2*e*math.sin(Mrad)
+                              + 4*e*y2*math.sin(Mrad)*math.cos(math.radians(2*L0))
+                              - 0.5*y2**2*math.sin(math.radians(4*L0))
+                              - 1.25*e**2*math.sin(2*Mrad))
+        cos_ha = (math.cos(math.radians(90.833))
+                  / (math.cos(math.radians(lat))*math.cos(math.radians(decl)))
+                  - math.tan(math.radians(lat))*math.tan(math.radians(decl)))
+        if not -1 <= cos_ha <= 1:
+            return {"sunrise": None, "sunset": None}
+        ha = math.degrees(math.acos(cos_ha))
+        noon_utc = 720 - 4*lng - EqT
+        offset_min = utc_offset_seconds / 60
+        def m2hm(mins):
+            mins = int(mins + offset_min) % (24*60)
+            return f"{mins//60:02d}:{mins%60:02d}"
+        return {"sunrise": m2hm(noon_utc - 4*ha), "sunset": m2hm(noon_utc + 4*ha)}
+    except:
+        return {"sunrise": None, "sunset": None}
+
 def calc_moon_times(moon_phase):
     def to_hhmm(total_minutes):
         m = int(total_minutes) % (24 * 60)
@@ -484,6 +523,8 @@ async def get_conditions(lat: float, lng: float):
     owm = safe(owm_data)
     uv = safe(uv_data)
     solar = safe(astro_data)
+    if not solar.get("sunrise") or not solar.get("sunset"):
+        solar = calc_sunrise_sunset(lat, lng, now, om.get("utc_offset_seconds", -14400))
     moon_phase = calc_moon_phase(now)
     moon_times = calc_moon_times(moon_phase)
     astro = {
