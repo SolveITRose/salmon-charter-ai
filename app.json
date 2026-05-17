@@ -75,7 +75,8 @@
         {
           "photosPermission": "Allow Fishing Reports AI to access your photos."
         }
-      ]
+      ],
+      "expo-speech-recognition"
     ],
     "scheme": "salmoncharterai",
     "experiments": {

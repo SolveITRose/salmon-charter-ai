@@ -20,7 +20,9 @@ import { saveEventSnapshot } from '../storage/eventStore';
 import { classifyCatch } from '../agents/catchClassifier';
 import { syncAllPending } from '../services/syncService';
 import VoiceInput from './VoiceInput';
+import VoiceCatchInput from './VoiceCatchInput';
 import { formatTimestamp } from '../utils/formatters';
+import { ParsedCatchFields } from '../agents/catchParser';
 
 const LURE_TYPES = ['Spoon', 'Flasher fly', 'Plug', 'Body bait'];
 const RIG_TYPES = ['Downrigger', 'Flatline'];
@@ -91,6 +93,26 @@ export default function BiteCompletionModal({ event, visible, onComplete, onClos
     } catch (err) {
       console.error('[BiteCompletion] handleTakePhoto error:', err);
     }
+  }, []);
+
+  const handleVoiceFill = useCallback((fields: ParsedCatchFields) => {
+    if (fields.targetSpecies) setTargetSpecies(fields.targetSpecies);
+    if (fields.lureType) setLureType(fields.lureType);
+    if (fields.lureColor) setLureColor(fields.lureColor);
+    if (fields.downriggerDepth !== undefined) setDownriggerDepth(String(fields.downriggerDepth));
+    if (fields.trollingSpeed !== undefined) setTrollingSpeed(String(fields.trollingSpeed));
+    if (fields.rigType) setRigType(fields.rigType);
+    if (fields.rigPosition) setRigPosition(fields.rigPosition);
+    if (fields.spreadPosition) setSpreadPosition(fields.spreadPosition);
+    if (fields.lineType) setLineType(fields.lineType);
+    if (fields.waterClarity) setWaterClarity(fields.waterClarity);
+    if (fields.waveDirection) setWaveDirection(fields.waveDirection);
+    if (fields.boatHeading) setBoatHeading(fields.boatHeading);
+    if (fields.windDir) setWindDir(fields.windDir);
+    if (fields.flasherColor) setFlasherColor(fields.flasherColor);
+    if (fields.leadLengthIn !== undefined) setLeadLength(String(fields.leadLengthIn));
+    if (fields.ballWeightLbs !== undefined) setBallWeight(String(fields.ballWeightLbs));
+    if (fields.backFromBall !== undefined) setBackFromBall(String(fields.backFromBall));
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -220,6 +242,12 @@ export default function BiteCompletionModal({ event, visible, onComplete, onClos
               <Text style={styles.bannerMeta}>
                 {event.setup.boatSide} · {formatTimestamp(event.biteTimestamp ?? event.timestamp)}
               </Text>
+            </View>
+
+            {/* Voice Quick Fill */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Voice Fill</Text>
+              <VoiceCatchInput onFill={handleVoiceFill} />
             </View>
 
             {/* Fish Photo */}
