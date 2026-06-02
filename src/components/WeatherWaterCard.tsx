@@ -39,7 +39,7 @@ interface WindRun {
   avgPrecip: number | null;
 }
 
-function groupWindRuns(winds: NonNullable<TripConditions['previous_wind']>): WindRun[] {
+function groupWindRuns(winds: NonNullable<TripConditions['previous_wind']>, descending = true): WindRun[] {
   const runs: WindRun[] = [];
   let i = 0;
   while (i < winds.length) {
@@ -62,7 +62,7 @@ function groupWindRuns(winds: NonNullable<TripConditions['previous_wind']>): Win
     });
     i = j;
   }
-  return runs.reverse();
+  return descending ? runs.reverse() : runs;
 }
 
 function dash(v: string | number | null | undefined): string {
@@ -336,7 +336,33 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
         </Section>
       )}
 
-      {/* 2. Water — Southern Georgian Bay Buoys */}
+      {/* 2. Weather Forecast */}
+      {conditions.forecast_wind && conditions.forecast_wind.length > 0 && (
+        <Section title={coordsLabel ? `Weather Forecast (next 48h, ${coordsLabel})` : 'Weather Forecast (next 48h)'}>
+          <View style={styles.windHistoryHeader}>
+            <Text style={[styles.windHistoryCol, styles.windHistoryColTime]}>Time</Text>
+            <Text style={styles.windHistoryCol}>km/h</Text>
+            <Text style={styles.windHistoryCol}>Hdg</Text>
+            <Text style={[styles.windHistoryCol, styles.windHistoryColDur]}>Dur</Text>
+            <Text style={styles.windHistoryCol}>Temp</Text>
+            <Text style={styles.windHistoryCol}>Cloud</Text>
+            <Text style={styles.windHistoryCol}>Precip</Text>
+          </View>
+          {groupWindRuns(conditions.forecast_wind, false).map((run, i) => (
+            <View key={i} style={styles.windHistoryRow}>
+              <Text style={[styles.windHistoryCol, styles.windHistoryColTime, styles.windHistoryVal]}>{run.time}</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{run.avgSpeedKmh}</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{run.label}</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryColDur, styles.windHistoryVal]}>{run.durationHours}h</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{run.avgTempC != null ? cToF(run.avgTempC) : '—'}</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{run.avgCloud != null ? `${run.avgCloud}%` : '—'}</Text>
+              <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{run.avgPrecip != null ? `${run.avgPrecip}mm` : '—'}</Text>
+            </View>
+          ))}
+        </Section>
+      )}
+
+      {/* 3. Water — Southern Georgian Bay Buoys */}
       <Section title="Water">
         <View style={styles.buoyTableHeader}>
           <Text style={[styles.buoyCol, styles.buoyColId, styles.buoyHeaderText]}>ID</Text>

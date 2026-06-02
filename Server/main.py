@@ -190,7 +190,7 @@ async def fetch_open_meteo(client, lat, lng):
             f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,"
             f"cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code"
             f"&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,precipitation,cloud_cover,pressure_msl"
-            f"&wind_speed_unit=mph&forecast_days=1&past_days=3&timezone=auto"
+            f"&wind_speed_unit=mph&forecast_days=2&past_days=3&timezone=auto"
         )
         resp = await client.get(url, timeout=10.0)
         return resp.json()
@@ -463,6 +463,35 @@ def build_previous_wind(om_data, now_utc):
     except:
         return []
 
+def build_forecast_wind(om_data, now_utc):
+    try:
+        hourly = om_data.get("hourly", {})
+        times = hourly.get("time", [])
+        speeds = hourly.get("wind_speed_10m", [])
+        dirs = hourly.get("wind_direction_10m", [])
+        temps = hourly.get("temperature_2m", [])
+        clouds = hourly.get("cloud_cover", [])
+        precip = hourly.get("precipitation", [])
+        pressures = hourly.get("pressure_msl", [])
+
+        now_local = local_now_str(om_data, now_utc)
+        result = []
+        for i, t in enumerate(times):
+            if t > now_local and i < len(speeds):
+                result.append({
+                    "time": format_hour_12(t),
+                    "speed_mph": r1(speeds[i]) if i < len(speeds) else None,
+                    "direction_deg": round(dirs[i]) if i < len(dirs) and dirs[i] is not None else 0,
+                    "direction_label": degrees_to_cardinal(dirs[i] if i < len(dirs) else None),
+                    "temp_c": r1(temps[i]) if i < len(temps) else None,
+                    "cloud_cover_pct": round(clouds[i]) if i < len(clouds) and clouds[i] is not None else None,
+                    "precipitation_mm": r1(precip[i]) if i < len(precip) else None,
+                    "pressure_hpa": round(pressures[i]) if i < len(pressures) and pressures[i] is not None else None,
+                })
+        return result[:48]
+    except:
+        return []
+
 def calc_pressure_trend(om_data, now_utc):
     try:
         hourly = om_data.get("hourly", {})
@@ -542,6 +571,7 @@ async def get_conditions(lat: float, lng: float):
     c = om.get("current", {})
     pressure_tendency, pressure_trend = calc_pressure_trend(om, now)
     prev_wind = build_previous_wind(om, now)
+    fcast_wind = build_forecast_wind(om, now)
     solunar = compute_solunar(astro, moon_phase)
 
     dew_point = None
@@ -603,6 +633,7 @@ async def get_conditions(lat: float, lng: float):
         "uv_index": uv.get("uv_index"),
         "uv_index_label": uv.get("uv_index_label"),
         "previous_wind": prev_wind,
+        "forecast_wind": fcast_wind,
         "marine_warning_active": warn.get("marine_warning_active", False),
         "marine_warning_text": warn.get("marine_warning_text"),
         "atmospheric_source": "owm" if OWM_KEY else "ndbc",
