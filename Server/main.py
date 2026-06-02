@@ -32,8 +32,9 @@ GB_BUOYS = [
 
 def degrees_to_cardinal(deg):
     if deg is None: return None
-    dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
-    return dirs[round(deg / 45) % 8]
+    dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+            'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
+    return dirs[round(deg / 22.5) % 16]
 
 def r1(n):
     if n is None: return None
@@ -452,7 +453,7 @@ def build_previous_wind(om_data, now_utc):
                 result.append({
                     "time": format_hour_12(t),
                     "speed_mph": r1(speeds[i]) if i < len(speeds) else None,
-                    "direction_deg": round(dirs[i]) if i < len(dirs) and dirs[i] is not None else 0,
+                    "direction_deg": round(dirs[i]) if i < len(dirs) and dirs[i] is not None else None,
                     "direction_label": degrees_to_cardinal(dirs[i] if i < len(dirs) else None),
                     "temp_c": r1(temps[i]) if i < len(temps) else None,
                     "cloud_cover_pct": round(clouds[i]) if i < len(clouds) and clouds[i] is not None else None,
@@ -481,7 +482,7 @@ def build_forecast_wind(om_data, now_utc):
                 result.append({
                     "time": format_hour_12(t),
                     "speed_mph": r1(speeds[i]) if i < len(speeds) else None,
-                    "direction_deg": round(dirs[i]) if i < len(dirs) and dirs[i] is not None else 0,
+                    "direction_deg": round(dirs[i]) if i < len(dirs) and dirs[i] is not None else None,
                     "direction_label": degrees_to_cardinal(dirs[i] if i < len(dirs) else None),
                     "temp_c": r1(temps[i]) if i < len(temps) else None,
                     "cloud_cover_pct": round(clouds[i]) if i < len(clouds) and clouds[i] is not None else None,

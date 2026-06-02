@@ -33,6 +33,7 @@ interface WindRun {
   time: string;
   avgSpeedKmh: number;
   label: string;
+  avgDeg: number | null;
   durationHours: number;
   avgTempC: number | null;
   avgCloud: number | null;
@@ -51,10 +52,18 @@ function groupWindRuns(winds: NonNullable<TripConditions['previous_wind']>, desc
     const temps = group.map(w => w.temp_c).filter((t): t is number => t !== null);
     const clouds = group.map(w => w.cloud_cover_pct).filter((c): c is number => c !== null);
     const precips = group.map(w => w.precipitation_mm).filter((p): p is number => p !== null && p > 0);
+    const degs = group.map(w => w.direction_deg).filter((d): d is number => d !== null);
+    let avgDeg: number | null = null;
+    if (degs.length > 0) {
+      const sinSum = degs.reduce((s, d) => s + Math.sin(d * Math.PI / 180), 0);
+      const cosSum = degs.reduce((s, d) => s + Math.cos(d * Math.PI / 180), 0);
+      avgDeg = Math.round((Math.atan2(sinSum, cosSum) * 180 / Math.PI + 360) % 360);
+    }
     runs.push({
       time: group[0].time,
       avgSpeedKmh,
       label,
+      avgDeg,
       durationHours: group.length,
       avgTempC: temps.length > 0 ? temps.reduce((s, t) => s + t, 0) / temps.length : null,
       avgCloud: clouds.length > 0 ? Math.round(clouds.reduce((s, c) => s + c, 0) / clouds.length) : null,
@@ -317,7 +326,7 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
           <View style={styles.windHistoryHeader}>
             <Text style={[styles.windHistoryCol, styles.windHistoryColTime]}>Time</Text>
             <Text style={styles.windHistoryCol}>km/h</Text>
-            <Text style={styles.windHistoryCol}>Hdg</Text>
+            <Text style={[styles.windHistoryCol, styles.windHistoryColHdg]}>Hdg</Text>
             <Text style={[styles.windHistoryCol, styles.windHistoryColDur]}>Dur</Text>
             <Text style={styles.windHistoryCol}>Temp</Text>
             <Text style={styles.windHistoryCol}>Cloud</Text>
@@ -328,7 +337,7 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
               <View key={`fc_${i}`} style={styles.windHistoryRow}>
                 <Text style={[styles.windHistoryCol, styles.windHistoryColTime, styles.windHistoryValForecast]}>{run.time}</Text>
                 <Text style={[styles.windHistoryCol, styles.windHistoryValForecast]}>{run.avgSpeedKmh}</Text>
-                <Text style={[styles.windHistoryCol, styles.windHistoryValForecast]}>{run.label}</Text>
+                <Text style={[styles.windHistoryCol, styles.windHistoryColHdg, styles.windHistoryValForecast]}>{run.label}{run.avgDeg !== null && run.avgSpeedKmh >= 5 ? ` ${run.avgDeg}°` : ''}</Text>
                 <Text style={[styles.windHistoryCol, styles.windHistoryColDur, styles.windHistoryValForecast]}>{run.durationHours}h</Text>
                 <Text style={[styles.windHistoryCol, styles.windHistoryValForecast]}>{run.avgTempC != null ? cToF(run.avgTempC) : '—'}</Text>
                 <Text style={[styles.windHistoryCol, styles.windHistoryValForecast]}>{run.avgCloud != null ? `${run.avgCloud}%` : '—'}</Text>
@@ -345,7 +354,7 @@ const WeatherWaterCard = memo(function WeatherWaterCard({
               <View key={`hist_${i}`} style={styles.windHistoryRow}>
                 <Text style={[styles.windHistoryCol, styles.windHistoryColTime, styles.windHistoryVal]}>{run.time}</Text>
                 <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{run.avgSpeedKmh}</Text>
-                <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{run.label}</Text>
+                <Text style={[styles.windHistoryCol, styles.windHistoryColHdg, styles.windHistoryVal]}>{run.label}{run.avgDeg !== null && run.avgSpeedKmh >= 5 ? ` ${run.avgDeg}°` : ''}</Text>
                 <Text style={[styles.windHistoryCol, styles.windHistoryColDur, styles.windHistoryVal]}>{run.durationHours}h</Text>
                 <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{run.avgTempC != null ? cToF(run.avgTempC) : '—'}</Text>
                 <Text style={[styles.windHistoryCol, styles.windHistoryVal]}>{run.avgCloud != null ? `${run.avgCloud}%` : '—'}</Text>
@@ -705,6 +714,9 @@ const styles = StyleSheet.create({
   },
   windHistoryVal: {
     color: '#ffffff',
+  },
+  windHistoryColHdg: {
+    flex: 1.6,
   },
   windHistoryValForecast: {
     color: '#facc15',

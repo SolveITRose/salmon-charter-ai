@@ -59,8 +59,8 @@ export interface TripConditions {
   conditions_text: string | null;
   uv_index: number | null;
   uv_index_label: string | null;
-  previous_wind: Array<{ time: string; speed_mph: number; direction_deg: number; direction_label: string; temp_c: number | null; cloud_cover_pct: number | null; precipitation_mm: number | null; pressure_hpa: number | null }> | null;
-  forecast_wind: Array<{ time: string; speed_mph: number; direction_deg: number; direction_label: string; temp_c: number | null; cloud_cover_pct: number | null; precipitation_mm: number | null; pressure_hpa: number | null }> | null;
+  previous_wind: Array<{ time: string; speed_mph: number; direction_deg: number | null; direction_label: string; temp_c: number | null; cloud_cover_pct: number | null; precipitation_mm: number | null; pressure_hpa: number | null }> | null;
+  forecast_wind: Array<{ time: string; speed_mph: number; direction_deg: number | null; direction_label: string; temp_c: number | null; cloud_cover_pct: number | null; precipitation_mm: number | null; pressure_hpa: number | null }> | null;
   marine_warning_active: boolean;
   marine_warning_text: string | null;
   atmospheric_source: 'ndbc' | 'owm';
